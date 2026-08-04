@@ -1,0 +1,34 @@
+import type { Command } from './types';
+import { tree } from './commands/tree';
+import { init } from './commands/init';
+import { newProject } from './commands/new';
+import { scan } from './commands/scan';
+import { open } from './commands/open';
+import { run } from './commands/run';
+import { pick } from './commands/pick';
+import { search } from './commands/search';
+import { ports } from './commands/ports';
+import { agentLog } from './commands/agent-log';
+import { prime } from './commands/prime';
+
+export const COMMANDS: Command[] = [
+	tree,
+	init,
+	newProject,
+	scan,
+	open,
+	run,
+	pick,
+	search,
+	ports,
+	agentLog,
+	prime
+];
+
+export const findCommand = (name: string): Command | undefined =>
+	COMMANDS.find((c) => c.name === name);
+
+export function usage(): string {
+	const rows = COMMANDS.map((c) => `  ${c.name.padEnd(10)} ${c.summary}`).join('\n');
+	return `atlas — project-atlas CLI\n\nUsage: atlas <command> [args]\n       atlas <query>           search projects (anything that isn't a command)\n\nCommands:\n${rows}\n`;
+}

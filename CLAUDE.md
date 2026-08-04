@@ -1,0 +1,75 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in `atlas-cli`.
+
+## Overview
+
+`atlas-cli` is the global **`atlas`** command — a thin Bun/TypeScript client to the
+project-atlas API (`atlas-api` on `:47891`). It is the single source of truth for
+cross-project atlas actions that used to be duplicated as per-project justfile recipes
+(e.g. the `claude-tree` recipe across 15 cookiecutter templates now just calls `atlas tree web`).
+
+It is a **consumer** of the API, not a producer — it never scans or reads the cache
+directly (that's atlas-api's job). When the API is down, `requireUp()` self-heals by
+kickstarting the `com.jurrejan.atlas-api` launchd daemon and polling before giving up;
+commands that skip `requireUp()` degrade gracefully (print the URL / a hint) instead.
+
+## Architecture
+
+```
+src/
+  atlas.ts        entry — shebang + argv router (help / dispatch)
+  registry.ts     COMMANDS table + usage() help text
+  types.ts        Command interface { name, summary, run(args) }
+  api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost
+  util.ts         die(), resolveRoot(), openUrl(), requireUp()
+  tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
+  template-discovery.ts  offline cookiecutter discovery + DEV_FOLDER/templatesDir (for `new`)
+  new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output)
+  commands/       one file per subcommand, each exporting a Command
+shell/
+  atlas.zsh       `atlas` zsh wrapper — cds into the project `atlas new` just created
+```
+
+## Shell integration (`shell/atlas.zsh`)
+
+A child process can't cd its parent shell. `atlas new` writes the created project path to
+`$ATLAS_CD_FILE` when that env var is set; the `atlas()` zsh function sets it, runs the real
+binary, then cds. Without the wrapper `new` just prints `cd <abs path>`. Sourced from
+`~/.zshrc` next to atlas-picker's `pj.zsh`. Any other subcommand passes straight through.
+
+| Command | Status | Notes |
+|---------|--------|-------|
+| `tree` | ✅ | no subcommand → prints tree help |
+| `tree view [path]` | ✅ | ascii CLAUDE.md tree in the terminal (from `?root=` graph) |
+| `tree search <q> [path]` | ✅ | case-insensitive search across every CLAUDE.md in the tree |
+| `tree compose [path]` | ✅ | concatenate the ancestor→project chain — the loaded context, as one md doc |
+| `tree web [path]` | ✅ | opens `/claude-tree?root=<path\|cwd>`; cookiecutter recipes call this |
+| `init` | ✅ | writes a starter `.atlas` (replaces the old `atlas-init` zsh fn) |
+| `new` | ✅ | scaffold a project: pick category (`/api/categories`) → template (`/api/templates`) → `cookiecutter`, then `POST /api/refresh`. Offline: local glob via `template-discovery.ts` + free-text category. Non-interactive: `atlas new <family/name> --name <n> --category <cat>\|--out <dir> [--var k=v ...]` (runs `cookiecutter --no-input`; agent-friendly). Ends inside the new project via the `shell/atlas.zsh` wrapper |
+| `scan` | ✅ | `POST /api/refresh`, prints project/framework counts |
+| `open` | ✅ | opens the atlas web UI |
+| `run` | 🚧 | planned — start/stop a dev server via `/api/run` |
+| `pick` | ✅ | passthrough to `atlas-picker` (cd needs the `pj` shell fn) |
+| `search <q>` | ✅ | substring match on project name/path via `/api/projects`; also the fallback for `atlas <query>` when the first arg isn't a command |
+| `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |
+| `__jump <q>` | ✅ | hidden — prints the best match's absolute path; `pj <query>` (atlas-picker's `shell/pj.zsh`) uses it to cd |
+
+## Adding a command
+
+1. Create `src/commands/<name>.ts` exporting `const <name>: Command` (keep it tiny —
+   one responsibility, lean on `api.ts`/`util.ts` helpers).
+2. Register it in `src/registry.ts` (`COMMANDS` array). Help text is generated from
+   `name` + `summary`.
+
+## Commands
+
+```bash
+bun install          # deps (bun-types, typescript)
+bun link             # install the `atlas` bin onto PATH (~/.bun/bin)
+bunx tsc --noEmit    # typecheck
+atlas help           # list commands
+```
+
+Conventions: Bun runtime, tabs, small functions (≤20 lines), files <150 lines.
+Override the API host with `ATLAS_API` (default `http://localhost:47891`).

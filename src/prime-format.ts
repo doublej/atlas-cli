@@ -1,0 +1,56 @@
+// Pure renderer for `atlas prime` — no API, no I/O (tree-format.ts pattern).
+// The command gathers PrimeData from local sources; this module only formats it.
+
+export interface PrimeData {
+	project: string;
+	session?: { count: number; lastAt: string; sessionId: string; summary?: string };
+	handoff?: { summary: string; atMs: number; auto: boolean };
+	journal?: { activeIntents: number; findings: number };
+	beads?: { open: number; inProgress: number; closed: number };
+	claudeMd?: { tokens: number; modifiedAt: string; staleSinceSessions: boolean };
+}
+
+/** Token count → `2.3k` past a thousand, else the bare number. */
+const fmtTokens = (n: number): string => (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n));
+
+/** Human age of a past instant: "just now", "5m ago", "3h ago", "12d ago". */
+export function formatAge(thenMs: number, nowMs: number): string {
+	const minutes = Math.floor((nowMs - thenMs) / 60_000);
+	if (minutes < 1) return 'just now';
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	return `${Math.floor(hours / 24)}d ago`;
+}
+
+/** Session briefing block — absent sections are simply omitted. */
+export function renderPrime(data: PrimeData, nowMs: number): string {
+	const age = (ms: number): string => formatAge(ms, nowMs);
+	const lines = [`atlas prime — ${data.project}`];
+	if (data.session) {
+		const s = data.session;
+		const summary = s.summary ? ` · ${s.summary}` : '';
+		lines.push(`  sessions:  ${s.count} · last ${age(Date.parse(s.lastAt))}${summary}`);
+		lines.push(`  resume:    claude --resume ${s.sessionId}`);
+	}
+	if (data.handoff) {
+		const tag = data.handoff.auto ? 'auto, ' : '';
+		lines.push(`  handoff:   ${data.handoff.summary} (${tag}${age(data.handoff.atMs)})`);
+	}
+	if (data.journal && (data.journal.activeIntents > 0 || data.journal.findings > 0)) {
+		lines.push(
+			`  journal:   ${data.journal.activeIntents} active intents · ${data.journal.findings} findings — run \`atlas agent-log recent\``
+		);
+	}
+	if (data.beads && (data.beads.open > 0 || data.beads.inProgress > 0)) {
+		lines.push(
+			`  beads:     ${data.beads.open} open · ${data.beads.inProgress} in progress · ${data.beads.closed} closed`
+		);
+	}
+	if (data.claudeMd) {
+		const edited = `edited ${age(Date.parse(data.claudeMd.modifiedAt))}`;
+		const stale = data.claudeMd.staleSinceSessions ? ' — stale vs recent sessions' : '';
+		lines.push(`  claude.md: ~${fmtTokens(data.claudeMd.tokens)} tokens · ${edited}${stale}`);
+	}
+	return lines.join('\n');
+}
