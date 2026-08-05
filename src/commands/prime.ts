@@ -95,7 +95,9 @@ async function readClaudeMd(root: string, lastSessionAt?: string): Promise<Prime
 			? stats.mtimeMs < Date.parse(lastSessionAt) - STALE_MARGIN_MS
 			: false;
 		return {
-			tokens: Math.round(content.length / 4),
+			// ~2.5 chars/token — mirrors estimateTokens in atlas-api's claude-tree.ts,
+			// calibrated against Claude Code's /context figures for CLAUDE.md files
+			tokens: Math.round(content.length / 2.5),
 			modifiedAt: new Date(stats.mtimeMs).toISOString(),
 			staleSinceSessions
 		};
