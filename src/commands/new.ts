@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -95,7 +96,9 @@ async function finish(target: string, startedAtMs: number, code: number): Promis
 		return;
 	}
 	const created = await findCreatedDir(target, startedAtMs);
-	if (created) {
+	// Template post-gen hooks run `atlas agent-log init` themselves; the shim's presence
+	// marks that. Only bootstrap here for templates without the hook.
+	if (created && !existsSync(join(created, 'agent-log'))) {
 		try {
 			bootstrapJournal(created);
 		} catch {
