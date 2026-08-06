@@ -27,7 +27,6 @@ const HOME = homedir();
 const shortHome = (p: string): string => (p.startsWith(HOME) ? '~' + p.slice(HOME.length) : p);
 /** Token count → `2.3k` past a thousand, else the bare number. */
 const fmtTokens = (n: number): string => (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n));
-const labelFor = (n: TreeNode): string => `${n.label}  [${n.kind}] ~${fmtTokens(n.preview.tokens)}`;
 
 /** Group nodes by their parent id (null = top-level) for tree walking. */
 function childrenByParent(nodes: TreeNode[]): Map<string | null, TreeNode[]> {
@@ -40,18 +39,36 @@ function childrenByParent(nodes: TreeNode[]): Map<string | null, TreeNode[]> {
 export function renderAsciiTree(nodes: TreeNode[]): string {
 	if (!nodes.length) return 'No CLAUDE.md found in this tree.';
 	const kids = childrenByParent(nodes);
-	const out: string[] = [];
+	const rows: { branch: string; node: TreeNode }[] = [];
 	const walk = (node: TreeNode, prefix: string, isLast: boolean): void => {
-		out.push(prefix + (isLast ? '└── ' : '├── ') + labelFor(node));
+		rows.push({ branch: prefix + (isLast ? '└── ' : '├── ') + node.label, node });
 		const next = prefix + (isLast ? '    ' : '│   ');
 		const children = kids.get(node.id) ?? [];
 		children.forEach((c, i) => walk(c, next, i === children.length - 1));
 	};
 	for (const root of kids.get(null) ?? []) {
-		out.push(labelFor(root));
+		rows.push({ branch: root.label, node: root });
 		const children = kids.get(root.id) ?? [];
 		children.forEach((c, i) => walk(c, '', i === children.length - 1));
 	}
+
+	// Column widths: branch/kind flush left, token counts flush right.
+	const cols = rows.map((r) => ({
+		branch: r.branch,
+		kind: `[${r.node.kind}]`,
+		tokens: `~${fmtTokens(r.node.preview.tokens)}`,
+		acc: `Σ${fmtTokens(r.node.tokensAccumulated)}`
+	}));
+	const width = (key: keyof (typeof cols)[0]): number =>
+		Math.max(...cols.map((c) => c[key].length));
+	const [bw, kw, tw, aw] = (['branch', 'kind', 'tokens', 'acc'] as const).map(width);
+
+	const out = cols.map(
+		(c) =>
+			`${c.branch.padEnd(bw)}  ${c.kind.padEnd(kw)}  ${c.tokens.padStart(tw)}  ${c.acc.padStart(aw)}`
+	);
+	const total = nodes.reduce((s, n) => s + n.preview.tokens, 0);
+	out.push('', `${nodes.length} documents · ~${fmtTokens(total)} tokens total`);
 	return out.join('\n');
 }
 
