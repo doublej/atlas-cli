@@ -22,38 +22,44 @@ src/
   registry.ts     COMMANDS table + usage() help text
   types.ts        Command interface { name, summary, run(args) }
   api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost
-  util.ts         die(), resolveRoot(), openUrl(), requireUp()
+  util.ts         die(), resolveRoot(), openUrl(), requireUp(), shellExec()/cdLine()
   tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
   template-discovery.ts  offline cookiecutter discovery + DEV_FOLDER/templatesDir (for `new`)
   new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output)
   commands/       one file per subcommand, each exporting a Command
 shell/
-  atlas.zsh       `atlas` zsh wrapper — cds into the project `atlas new` just created
+  atlas.zsh       `atlas` zsh wrapper (+ the `pj` function) — evals what the CLI hands back
 ```
 
 ## Shell integration (`shell/atlas.zsh`)
 
-A child process can't cd its parent shell. `atlas new` writes the created project path to
-`$ATLAS_CD_FILE` when that env var is set; the `atlas()` zsh function sets it, runs the real
-binary, then cds. Without the wrapper `new` just prints `cd <abs path>`. Sourced from
-`~/.zshrc` next to atlas-picker's `pj.zsh`. Any other subcommand passes straight through.
+A child process can't cd — or run anything — in the shell that spawned it. So commands that
+need the parent shell write one shell line to `$ATLAS_SHELL_FILE`; the `atlas()` zsh function
+creates that file, runs the real binary, then evals the line (`util.ts:shellExec`/`cdLine`).
+Without the wrapper the line is printed instead, so it stays copy-pasteable. Users: `jump`
+(cd, plus `--run`'s command chained after it) and `new` (cd into what it scaffolded).
+Everything else passes straight through, exit code intact.
+
+`pj` lives here too and is just `atlas jump "$@"` — the query/picker/`exec:` handling that
+used to be duplicated in atlas-picker's `shell/pj.zsh` is now in the CLI. `pj.zsh` keeps
+only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from `~/.zshrc`.
 
 | Command | Status | Notes |
 |---------|--------|-------|
 | `tree` | ✅ | no subcommand → prints tree help |
-| `tree view [path]` | ✅ | ascii CLAUDE.md tree in the terminal (from `?root=` graph) |
+| `tree view [path] [--up]` | ✅ | ascii CLAUDE.md tree in the terminal (from `?root=` graph). `--up` requests `&up=1` — only the chain towards the root, skipping the walk into children |
 | `tree search <q> [path]` | ✅ | case-insensitive search across every CLAUDE.md in the tree |
-| `tree compose [path]` | ✅ | concatenate the ancestor→project chain — the loaded context, as one md doc |
+| `tree compose [path]` | ✅ | concatenate the ancestor→project chain — the loaded context, as one md doc (always `&up=1`; the chain *is* the up graph) |
 | `tree web [path]` | ✅ | opens `/claude-tree?root=<path\|cwd>`; cookiecutter recipes call this |
 | `init` | ✅ | writes a starter `.atlas` (replaces the old `atlas-init` zsh fn) |
 | `new` | ✅ | scaffold a project: pick category (`/api/categories`) → template (`/api/templates`) → `cookiecutter`, then `POST /api/refresh`. Offline: local glob via `template-discovery.ts` + free-text category. Non-interactive: `atlas new <family/name> --name <n> --category <cat>\|--out <dir> [--var k=v ...]` (runs `cookiecutter --no-input`; agent-friendly). Ends inside the new project via the `shell/atlas.zsh` wrapper |
 | `scan` | ✅ | `POST /api/refresh`, prints project/framework counts |
 | `open` | ✅ | opens the atlas web UI |
 | `run` | 🚧 | planned — start/stop a dev server via `/api/run` |
-| `pick` | ✅ | passthrough to `atlas-picker` (cd needs the `pj` shell fn) |
-| `search <q>` | ✅ | substring match on project name/path via `/api/projects`; also the fallback for `atlas <query>` when the first arg isn't a command |
+| `pick` | ✅ | passthrough to `atlas-picker` (prints only — use `jump`/`pj` to cd) |
+| `jump [q] [--run <cmd>]` | ✅ | the whole `pj` flow: best match, or the fuzzy picker with no query → hands the shell `cd <path> && echo → <name>`, with `--run`'s command chained on. `--run` is eval'd in the shell, so aliases and functions work |
+| `search <q>` | ✅ | substring match on project name/path via `/api/projects`; also the fallback for `atlas <query>` when the first arg isn't a command. With `--run` it delegates to `jump`, so `atlas <query> --run <cmd>` works |
 | `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |
-| `__jump <q>` | ✅ | hidden — prints the best match's absolute path; `pj <query>` (atlas-picker's `shell/pj.zsh`) uses it to cd |
 
 ## Adding a command
 
