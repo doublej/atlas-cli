@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { API_BASE, isUp } from './api';
 
 /** Print to stderr and exit non-zero. */
@@ -13,6 +13,25 @@ export const resolveRoot = (arg?: string): string => (arg ? resolve(arg) : proce
 /** Open a URL in the default browser (macOS `open`). */
 export async function openUrl(url: string): Promise<void> {
 	await Bun.spawn(['open', url], { stdout: 'inherit', stderr: 'inherit' }).exited;
+}
+
+/** Single-quote a value so the parent shell takes it literally. */
+export const shellQuote = (s: string): string => `'${s.replaceAll("'", `'\\''`)}'`;
+
+/** The shell line that lands the user in `dir`: cd + the one-line confirmation. */
+export const cdLine = (dir: string): string =>
+	`cd ${shellQuote(dir)} && echo ${shellQuote(`→ ${basename(dir)}`)}`;
+
+/**
+ * Hand a command line to the parent shell. A child process can't cd (or run anything)
+ * in the shell that spawned it, so the `atlas` zsh wrapper (`shell/atlas.zsh`) passes
+ * `$ATLAS_SHELL_FILE` and evals whatever we write there. Without the wrapper, print the
+ * line so it stays copy-pasteable (or `eval "$(atlas …)"`-able).
+ */
+export async function shellExec(line: string): Promise<void> {
+	const file = process.env.ATLAS_SHELL_FILE;
+	if (file) await Bun.write(file, `${line}\n`);
+	else console.log(line);
 }
 
 const daemonTarget = () => `gui/${process.getuid?.() ?? 0}/com.jurrejan.atlas-api`;

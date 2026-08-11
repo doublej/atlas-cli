@@ -1,6 +1,6 @@
 import type { Command } from '../types';
 import { apiGet } from '../api';
-import { die, requireUp } from '../util';
+import { cdLine, die, requireUp, shellExec } from '../util';
 
 type Project = { name: string; path: string; relativePath: string };
 type Atlas = { projects: Project[] };
@@ -25,14 +25,44 @@ async function findProjects(args: string[]): Promise<Project[]> {
 	return found;
 }
 
-/**
- * `atlas __jump <query>` — print the best match's absolute path. Called by the
- * `atlas` zsh wrapper (shell/atlas.zsh), which cds to it.
- */
-export async function jump(args: string[]): Promise<void> {
-	const [best] = await findProjects(args);
-	console.log(best.path);
+/** Split `--run <cmd…>` off the argv — everything after the flag is one command line. */
+export function splitRun(args: string[]): { query: string[]; cmd: string } {
+	const i = args.indexOf('--run');
+	if (i === -1) return { query: args, cmd: '' };
+	const cmd = args.slice(i + 1).join(' ').trim();
+	if (!cmd) die('usage: atlas jump [query] --run <command>');
+	return { query: args.slice(0, i), cmd };
 }
+
+/** Fuzzy-pick a project. Returns an absolute path, an `exec:<shell cmd>` line, or ''. */
+async function pickTarget(): Promise<string> {
+	const proc = Bun.spawn(['atlas-picker', '--action', 'print', '--output', 'path'], {
+		stdin: 'inherit',
+		stdout: 'pipe',
+		stderr: 'inherit'
+	});
+	const out = (await new Response(proc.stdout).text()).trim();
+	if ((await proc.exited) !== 0) die('atlas-picker failed (installed? `just reinstall` in atlas-picker)');
+	return out;
+}
+
+/**
+ * `atlas jump [query] [--run <cmd…>]` — the whole `pj` flow: resolve a target (best
+ * match, or the fuzzy picker without a query) and hand the parent shell the `cd` line,
+ * with `--run`'s command chained after it. Also reached via `atlas <query> --run <cmd>`.
+ */
+export const jump: Command = {
+	name: 'jump',
+	summary: 'cd to a project (fuzzy picker with no query); --run <cmd> runs it there',
+	async run(args) {
+		const { query, cmd } = splitRun(args);
+		const target = query.length ? (await findProjects(query))[0].path : await pickTarget();
+		if (!target) return; // picker cancelled
+		// The picker's action selections are already shell command lines.
+		const line = target.startsWith('exec:') ? target.slice('exec:'.length) : cdLine(target);
+		await shellExec(cmd ? `${line} && ${cmd}` : line);
+	}
+};
 
 /**
  * `atlas search <query>` — find projects by name/path substring.
@@ -42,6 +72,7 @@ export const search: Command = {
 	name: 'search',
 	summary: 'find projects by name (also: atlas <query>)',
 	async run(args) {
+		if (args.includes('--run')) return jump.run(args);
 		const found = await findProjects(args);
 		const width = Math.max(...found.map((p) => p.name.length));
 		for (const p of found) console.log(`${p.name.padEnd(width)}  ${p.relativePath}`);

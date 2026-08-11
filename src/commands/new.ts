@@ -8,7 +8,7 @@ import { bootstrapJournal } from '../agent-log/init';
 import { getCategoryTemplates } from '../../../shared/templates';
 import { DEV_FOLDER, discoverTemplates, templatesDir, type Template } from '../template-discovery';
 import { pickCategory, pickOutputDir, pickTemplate, type Category } from '../new-prompts';
-import { die } from '../util';
+import { cdLine, die, shellExec } from '../util';
 
 const NEW_USAGE = `atlas new — scaffold a project from a cookiecutter template
 
@@ -75,19 +75,8 @@ async function findCreatedDir(target: string, startedAtMs: number): Promise<stri
 	}
 }
 
-/**
- * Land the user in the new project. A child process can't cd its parent shell, so the
- * `atlas` zsh wrapper (`shell/atlas.zsh`) passes `ATLAS_CD_FILE` and cds to what we write
- * there. Without the wrapper, print the absolute path as a copy-pasteable `cd`.
- */
-async function handOff(created: string): Promise<void> {
-	const cdFile = process.env.ATLAS_CD_FILE;
-	if (cdFile) {
-		await Bun.write(cdFile, created);
-		return;
-	}
-	console.log(`  cd ${created}`);
-}
+/** Land the user in the new project — the `atlas` zsh wrapper evals the cd (see `shellExec`). */
+const handOff = (created: string): Promise<void> => shellExec(cdLine(created));
 
 /** Post-scaffold tail shared by both flows: journal bootstrap + atlas rescan + cd hand-off. */
 async function finish(target: string, startedAtMs: number, code: number): Promise<void> {

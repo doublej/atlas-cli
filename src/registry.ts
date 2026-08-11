@@ -6,7 +6,7 @@ import { scan } from './commands/scan';
 import { open } from './commands/open';
 import { run } from './commands/run';
 import { pick } from './commands/pick';
-import { search } from './commands/search';
+import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
@@ -19,6 +19,7 @@ export const COMMANDS: Command[] = [
 	open,
 	run,
 	pick,
+	jump,
 	search,
 	ports,
 	agentLog,
