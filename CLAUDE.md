@@ -24,6 +24,7 @@ src/
   api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost
   util.ts         die(), resolveRoot(), openUrl(), requireUp(), shellExec()/cdLine()
   tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
+  logo.ts         atlas-picker's splash art, reused by `atlas help` (copy of splash.rs)
   template-discovery.ts  offline cookiecutter discovery + DEV_FOLDER/templatesDir (for `new`)
   new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output)
   commands/       one file per subcommand, each exporting a Command
@@ -59,6 +60,7 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 | `pick` | ✅ | passthrough to `atlas-picker` (prints only — use `jump`/`pj` to cd) |
 | `jump [q] [--run <cmd>]` | ✅ | the whole `pj` flow: best match, or the fuzzy picker with no query → hands the shell `cd <path> && echo → <name>`, with `--run`'s command chained on. `--run` is eval'd in the shell, so aliases and functions work |
 | `search <q>` | ✅ | substring match on project name/path via `/api/projects`; also the fallback for `atlas <query>` when the first arg isn't a command. With `--run` it delegates to `jump`, so `atlas <query> --run <cmd>` works |
+| `install-autocompletion` | ✅ | generates `_atlas` (zsh, completes `atlas` **and** `pj`) into the first `$fpath` dir under `$HOME` — `~/.zsh/completions` when it's registered. Commands + summaries come from `COMMANDS`, so **rerun it after adding a command**; project names come from the scan cache via `jq` at completion time (no bun spawn per Tab). After `--run` it shifts the frame and calls `_normal`, so the command being run completes normally |
 | `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |
 
 ## Adding a command

@@ -10,6 +10,8 @@ import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
+import { installAutocompletion } from './commands/install-autocompletion';
+import { banner } from './logo';
 
 export const COMMANDS: Command[] = [
 	tree,
@@ -23,13 +25,15 @@ export const COMMANDS: Command[] = [
 	search,
 	ports,
 	agentLog,
-	prime
+	prime,
+	installAutocompletion
 ];
 
 export const findCommand = (name: string): Command | undefined =>
 	COMMANDS.find((c) => c.name === name);
 
 export function usage(): string {
-	const rows = COMMANDS.map((c) => `  ${c.name.padEnd(10)} ${c.summary}`).join('\n');
-	return `atlas — project-atlas CLI\n\nUsage: atlas <command> [args]\n       atlas <query>           search projects (anything that isn't a command)\n\nCommands:\n${rows}\n`;
+	const width = Math.max(...COMMANDS.map((c) => c.name.length));
+	const rows = COMMANDS.map((c) => `  ${c.name.padEnd(width)} ${c.summary}`).join('\n');
+	return `${banner()}\n\nUsage: atlas <command> [args]\n       atlas <query>           search projects (anything that isn't a command)\n\nCommands:\n${rows}\n`;
 }
