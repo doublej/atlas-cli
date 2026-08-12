@@ -3,7 +3,14 @@ import type { Command } from '../types';
 import { die } from '../util';
 import { bootstrapJournal } from '../agent-log/init';
 
-const TEMPLATE = JSON.stringify({ description: '', archived: false }, null, 2) + '\n';
+// The agent-log block opts the workspace into coordination (default mode: warn);
+// a bare .atlas without the block is treated as observe-only by the resolver.
+const TEMPLATE =
+	JSON.stringify(
+		{ description: '', archived: false, 'agent-log': { mode: 'warn', aliases: {} } },
+		null,
+		2
+	) + '\n';
 
 /** `atlas init` — write a starter .atlas metadata file and bootstrap the agent journal. */
 export const init: Command = {

@@ -27,6 +27,10 @@ export const USAGE = `usage:
   atlas agent-log end OP_ID [--outcome ok|failed|cancelled] -- SUMMARY
   atlas agent-log handoff [--scope SCOPE] [--bead ID] -- SUMMARY
   atlas agent-log run build|deploy|test --scope SCOPE [--bead ID] [--ttl 20m] -- COMMAND...
+  atlas agent-log status [--json] [--session ID]
+  atlas agent-log claim SCOPE... [--ttl 20m] [--session ID] [--task ID] -- WHY
+  atlas agent-log release [SCOPE...] [--session ID]
+  atlas agent-log doctor
   atlas agent-log init
   atlas agent-log console`;
 

@@ -1,6 +1,7 @@
 /** SQLite event store — one journal per repo, in the git common dir (worktree-shared). */
 import { Database } from 'bun:sqlite';
 import { resolve } from 'node:path';
+import { migrate } from './schema';
 import { mirrorEvent } from './mirror';
 
 export type EventKind = 'intent' | 'finding' | 'end' | 'handoff';
@@ -35,11 +36,7 @@ function databasePath(): string {
 function openDatabase(): Database {
 	const db = new Database(databasePath(), { create: true });
 	db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL');
-	db.exec(`CREATE TABLE IF NOT EXISTS events (
-		seq INTEGER PRIMARY KEY, at_ms INTEGER NOT NULL, kind TEXT NOT NULL, op_id TEXT NOT NULL,
-		operation TEXT NOT NULL, actor TEXT NOT NULL, bead TEXT NOT NULL, scopes TEXT NOT NULL,
-		summary TEXT NOT NULL, expires_ms INTEGER, outcome TEXT NOT NULL, detail TEXT NOT NULL
-	)`);
+	migrate(db);
 	return db;
 }
 

@@ -37,7 +37,16 @@ function shortenAgentId(id: string): string {
 
 /** Always `<agent>@<repo>`, whichever way the agent identified itself. */
 export function currentActor(): string {
+	return `${agentId()}@${basename(process.cwd())}`;
+}
+
+/** Stable actor for a coordination workspace: the boundary root, not the cwd. */
+export function boundaryActor(root: string): string {
+	return `${agentId()}@${basename(root)}`;
+}
+
+function agentId(): string {
 	const named = process.env.AGENT_ID ?? process.env.CLAUDE_AGENT_ID ?? process.env.CODEX_THREAD_ID;
-	const agent = named ? shortenAgentId(named) : (agentAncestor() ?? process.env.USER ?? 'agent');
-	return `${agent}@${basename(process.cwd())}`;
+	if (named) return shortenAgentId(named);
+	return agentAncestor() ?? process.env.USER ?? 'agent';
 }
