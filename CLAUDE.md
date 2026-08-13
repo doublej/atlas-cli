@@ -58,7 +58,7 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 | `open` | ✅ | opens the atlas web UI |
 | `run` | 🚧 | planned — start/stop a dev server via `/api/run` |
 | `pick` | ✅ | passthrough to `atlas-picker` (prints only — use `jump`/`pj` to cd) |
-| `jump [q] [--run <cmd>]` | ✅ | the whole `pj` flow: best match, or the fuzzy picker with no query → hands the shell `cd <path> && echo → <name>`, with `--run`'s command chained on. `--run` is eval'd in the shell, so aliases and functions work |
+| `jump [q] [--run <cmd>]` | ✅ | the whole `pj` flow: best match, or the fuzzy picker with no query → hands the shell `cd <path> && echo → <name>`, with `--run`'s command chained on (`--cmd`/`-r` are aliases). `--run` is eval'd in the shell, so aliases and functions work; an unknown flag errors instead of being searched for |
 | `search <q>` | ✅ | substring match on project name/path via `/api/projects`; also the fallback for `atlas <query>` when the first arg isn't a command. With `--run` it delegates to `jump`, so `atlas <query> --run <cmd>` works |
 | `install-autocompletion` | ✅ | generates `_atlas` (zsh, completes `atlas` **and** `pj`) into the first `$fpath` dir under `$HOME` — `~/.zsh/completions` when it's registered. Commands + summaries come from `COMMANDS`, so **rerun it after adding a command**; project names come from the scan cache via `jq` at completion time (no bun spawn per Tab). After `--run` it shifts the frame and calls `_normal`, so the command being run completes normally |
 | `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |

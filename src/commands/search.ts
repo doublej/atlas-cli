@@ -25,13 +25,23 @@ async function findProjects(args: string[]): Promise<Project[]> {
 	return found;
 }
 
+/** `--run` and its aliases: everything after one of these is the command line. */
+export const RUN_FLAGS = ['--run', '--cmd', '-r'];
+
 /** Split `--run <cmd…>` off the argv — everything after the flag is one command line. */
+/** A flag left in the query would otherwise be searched for as if it were a project name. */
+export const findUnknownFlag = (query: string[]): string | undefined =>
+	query.find((a) => a.startsWith('-'));
+
 export function splitRun(args: string[]): { query: string[]; cmd: string } {
-	const i = args.indexOf('--run');
-	if (i === -1) return { query: args, cmd: '' };
+	const i = args.findIndex((a) => RUN_FLAGS.includes(a));
+	const query = i === -1 ? args : args.slice(0, i);
+	const bad = findUnknownFlag(query);
+	if (bad) die(`Unknown flag "${bad}". Usage: atlas jump [query] --run <command>`);
+	if (i === -1) return { query, cmd: '' };
 	const cmd = args.slice(i + 1).join(' ').trim();
 	if (!cmd) die('usage: atlas jump [query] --run <command>');
-	return { query: args.slice(0, i), cmd };
+	return { query, cmd };
 }
 
 /** Fuzzy-pick a project. Returns an absolute path, an `exec:<shell cmd>` line, or ''. */
@@ -72,8 +82,9 @@ export const search: Command = {
 	name: 'search',
 	summary: 'find projects by name (also: atlas <query>)',
 	async run(args) {
-		if (args.includes('--run')) return jump.run(args);
-		const found = await findProjects(args);
+		if (args.some((a) => RUN_FLAGS.includes(a))) return jump.run(args);
+		const { query } = splitRun(args);
+		const found = await findProjects(query);
 		const width = Math.max(...found.map((p) => p.name.length));
 		for (const p of found) console.log(`${p.name.padEnd(width)}  ${p.relativePath}`);
 	}

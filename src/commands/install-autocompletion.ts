@@ -35,7 +35,7 @@ ${rows}
 	)
 
 	# Past a --run, the rest is a command line for the shell — complete it as one.
-	local ri=\${words[(i)--run]}
+	local ri=\${words[(i)(--run|--cmd|-r)]}
 	if (( ri < CURRENT )); then
 		shift $ri words
 		(( CURRENT -= ri ))

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { splitRun } from './search';
+import { findUnknownFlag, splitRun } from './search';
 import { cdLine } from '../util';
 
 describe('splitRun', () => {
@@ -16,6 +16,16 @@ describe('splitRun', () => {
 
 	test('--run without a query is the picker + command form', () => {
 		expect(splitRun(['--run', 'git status'])).toEqual({ query: [], cmd: 'git status' });
+	});
+
+	test('--cmd and -r are aliases of --run', () => {
+		expect(splitRun(['utt', '--cmd', 'cld'])).toEqual({ query: ['utt'], cmd: 'cld' });
+		expect(splitRun(['utt', '-r', 'cld'])).toEqual({ query: ['utt'], cmd: 'cld' });
+	});
+
+	test('an unknown flag is rejected, not searched for', () => {
+		expect(findUnknownFlag(['utt', '--nope'])).toBe('--nope');
+		expect(findUnknownFlag(splitRun(['utt', '--run', 'ls -l']).query)).toBeUndefined();
 	});
 });
 
