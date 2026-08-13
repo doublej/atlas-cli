@@ -1,7 +1,8 @@
 /**
  * Session and task bookkeeping for Agent Log v2. Sessions are the coordination
- * identity (boundary + actor); tasks carry the lease rationale and survive the
- * leases themselves. Both are created lazily on the first claim.
+ * identity (boundary + actor, subagents get their own id with a parent link);
+ * tasks carry the lease rationale and survive the leases themselves. Both are
+ * created lazily on the first claim or hook event.
  */
 import { createHash } from 'node:crypto';
 import type { Database } from 'bun:sqlite';
@@ -27,11 +28,24 @@ export function ensureSession(
 	boundaryId: string,
 	sessionId: string,
 	actor: string,
-	now: number
+	now: number,
+	parentId: string | null = null
 ): void {
-	db.query(`INSERT OR IGNORE INTO sessions (id, boundary_id, actor, started_at, last_heartbeat, status)
-		VALUES (?, ?, ?, ?, ?, 'active')`).run(sessionId, boundaryId, actor, now, now);
+	db.query(`INSERT OR IGNORE INTO sessions (id, boundary_id, actor, started_at, last_heartbeat, status, parent_id)
+		VALUES (?, ?, ?, ?, ?, 'active', ?)`).run(sessionId, boundaryId, actor, now, now, parentId);
 	db.query('UPDATE sessions SET last_heartbeat = ? WHERE id = ?').run(now, sessionId);
+}
+
+/** Close the session and its open tasks (status → closed). Tasks die with the session. */
+export function closeSession(db: Database, sessionId: string, now: number): number {
+	const closed = Number(
+		db.query(`UPDATE sessions SET status = 'closed', closed_at = ? WHERE id = ? AND status = 'active'`)
+			.run(now, sessionId).changes
+	);
+	if (closed > 0)
+		db.query(`UPDATE tasks SET status = 'closed', closed_at = ? WHERE session_id = ? AND status = 'open'`)
+			.run(now, sessionId);
+	return closed;
 }
 
 /** Attach to the session's newest open task, or open one titled by the rationale. */

@@ -6,6 +6,14 @@ export interface PrimeData {
 	session?: { count: number; lastAt: string; sessionId: string; summary?: string };
 	handoff?: { summary: string; atMs: number; auto: boolean };
 	journal?: { activeIntents: number; findings: number };
+	coordination?: {
+		mode: string;
+		boundary: string;
+		activeSessions: number;
+		liveLeases: number;
+		openTasks: number;
+		task?: string;
+	};
 	beads?: { open: number; inProgress: number; closed: number };
 	claudeMd?: { tokens: number; modifiedAt: string; staleSinceSessions: boolean };
 }
@@ -40,6 +48,12 @@ export function renderPrime(data: PrimeData, nowMs: number): string {
 	if (data.journal && (data.journal.activeIntents > 0 || data.journal.findings > 0)) {
 		lines.push(
 			`  journal:   ${data.journal.activeIntents} active intents · ${data.journal.findings} findings — run \`atlas agent-log recent\``
+		);
+	}
+	if (data.coordination) {
+		const task = data.coordination.task ? ` · task: ${data.coordination.task}` : '';
+		lines.push(
+			`  coord:     ${data.coordination.mode} (${data.coordination.boundary}) · ${data.coordination.activeSessions} session(s) · ${data.coordination.liveLeases} lease(s) · ${data.coordination.openTasks} open task(s)${task}`
 		);
 	}
 	if (data.beads && (data.beads.open > 0 || data.beads.inProgress > 0)) {

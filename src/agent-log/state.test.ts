@@ -237,7 +237,7 @@ describe('doctor', () => {
 		expect(spawnCli(['claim', 'path:src/a', '--', 'doctor probe'], repo, env).exitCode).toBe(0);
 		const result = spawnCli(['doctor'], repo, env);
 		expect(result.exitCode).toBe(0);
-		expect(result.stdout.toString()).toContain('schema:    v2 (ok)');
+		expect(result.stdout.toString()).toContain('schema:    v3 (ok)');
 		rmSync(repo, { recursive: true, force: true });
 	});
 
@@ -320,7 +320,7 @@ describe('status', () => {
 		rmSync(repo, { recursive: true, force: true });
 	});
 
-	test('runDoctor returns ok for a fresh workspace', () => {
-		expect(runDoctor(ws({ id: 'doctor-ws' })).ok).toBe(true);
+	test('runDoctor returns ok for a fresh observe-mode workspace', () => {
+		expect(runDoctor(ws({ id: 'doctor-ws', mode: 'observe' })).ok).toBe(true);
 	});
 });

@@ -28,8 +28,13 @@ export const USAGE = `usage:
   atlas agent-log handoff [--scope SCOPE] [--bead ID] -- SUMMARY
   atlas agent-log run build|deploy|test --scope SCOPE [--bead ID] [--ttl 20m] -- COMMAND...
   atlas agent-log status [--json] [--session ID]
-  atlas agent-log claim SCOPE... [--ttl 20m] [--session ID] [--task ID] -- WHY
+  atlas agent-log claim SCOPE... [--force] [--ttl 20m] [--session ID] [--task ID] -- WHY
   atlas agent-log release [SCOPE...] [--session ID]
+  atlas agent-log renew [--ttl 20m] [--session ID]
+  atlas agent-log checkpoint [--done TEXT] [--next TEXT] [--blocked TEXT] [--session ID]
+  atlas agent-log guard [--scope SCOPE]... [--session ID] -- COMMAND...
+  atlas agent-log hook EVENT [--harness claude|codex]   (hook JSON on stdin)
+  atlas agent-log gc [--dry-run]
   atlas agent-log doctor
   atlas agent-log init
   atlas agent-log console`;

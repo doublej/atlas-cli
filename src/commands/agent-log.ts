@@ -5,14 +5,19 @@ import { bootstrapJournal } from '../agent-log/init';
 import { openConsole } from '../agent-log/mirror';
 import { recent } from '../agent-log/render';
 import { runWrapped } from '../agent-log/run';
-import { sessionEnd } from '../agent-log/session-end';
 import { boundaryActor } from '../agent-log/actor';
 import { resolveWorkspace, type Workspace } from '../agent-log/project';
 import { claimScopes } from '../agent-log/leases';
-import { releaseScopes } from '../agent-log/lifecycle';
+import { releaseScopes, renewLeases } from '../agent-log/lifecycle';
 import { sessionIdFor } from '../agent-log/sessions';
 import { gatherStatus, renderStatus } from '../agent-log/status';
 import { runDoctor } from '../agent-log/doctor';
+import { runHookEvent } from '../agent-log/hook-run';
+import { parseHookInput, type Harness } from '../agent-log/hooks';
+import { checkpointEvent } from '../agent-log/transitions';
+import { guardCommand, guardFinished } from '../agent-log/guard';
+import { runGc } from '../agent-log/gc';
+import { openJournal } from '../agent-log/schema';
 
 const HELP = `atlas agent-log — shared agent journal for concurrent agents (SQLite in the git common dir)
 
@@ -30,7 +35,12 @@ ${USAGE}
   status    compact state snapshot: task, peers, owned/conflicting leases
   claim     acquire exclusive write leases for scopes (atomic, renewable)
   release   release the session's leases (all, or the given scopes)
-  doctor    schema version, stale sessions, expired leases, aliases, clock
+  renew     renew the session's live leases (heartbeat + expiry)
+  checkpoint  structured handoff state: --done --next --blocked
+  guard     lease-aware wrapper: claim derived scopes, run, release
+  hook      harness hook adapter (Claude Code + Codex JSON on stdin)
+  gc        retention sweep for telemetry, expired leases, closed sessions
+  doctor    schema version, hook coverage, stale sessions, aliases, clock
 
 Env: ATLAS_AGENT_LOG_PATH overrides the journal db location.`;
 
@@ -40,20 +50,102 @@ function requireWorkspace(): Workspace {
 	return workspace;
 }
 
+function sessionId(workspace: Workspace, parsed: ReturnType<typeof splitArgs>): string {
+	return sessionIdFor(workspace, boundaryActor(workspace.root), parsed.options.get('--session')?.[0]);
+}
+
 /** `atlas agent-log <sub>` — the shared agent journal + coordination state. */
 export const agentLog: Command = {
 	name: 'agent-log',
-	summary: 'shared agent journal — recent/begin/finding/end/run/init + status/claim/release/doctor',
+	summary: 'shared agent journal — recent/begin/finding/end/run + status/claim/release/renew/checkpoint/guard/hook/gc/doctor',
 	async run(args) {
 		const [sub, ...rest] = args;
 		if (!sub || sub === 'help' || sub === '--help') return console.log(HELP);
 		if (sub === 'init') return bootstrapJournal(process.cwd());
 		if (sub === 'console') return openConsole();
-		if (sub === 'session-end') return sessionEnd();
+		if (sub === 'session-end') {
+			try {
+				const raw = JSON.parse(await Bun.stdin.text()) as Record<string, unknown>;
+				runHookEvent(parseHookInput('claude', 'SessionEnd', raw));
+			} catch {
+				// a broken journal must never break ending a session
+			}
+			return;
+		}
 		if (sub === 'doctor') {
 			const report = runDoctor(requireWorkspace());
 			console.log(`atlas agent-log doctor\n${report.lines.join('\n')}`);
 			process.exit(report.ok ? 0 : 1);
+		}
+		if (sub === 'hook') {
+			try {
+				const event = rest[0] ?? '';
+				const harness: Harness = rest[1] === '--harness' ? (rest[2] as Harness) : 'claude';
+				const raw = JSON.parse(await Bun.stdin.text()) as Record<string, unknown>;
+				const decision = runHookEvent(parseHookInput(harness, event, raw));
+				if (decision.context)
+					console.log(JSON.stringify({ additionalContext: decision.context }));
+				else if (decision.block !== undefined)
+					console.log(
+						JSON.stringify(
+							harness === 'codex'
+								? { block: decision.block, reason: decision.reason ?? '' }
+								: { decision: decision.block ? 'block' : 'allow', reason: decision.reason ?? '' }
+						)
+					);
+			} catch {
+				// hooks must never break the harness
+			}
+			return;
+		}
+		if (sub === 'gc') {
+			const workspace = requireWorkspace();
+			console.log(
+				`atlas agent-log gc — ${workspace.root}\n${runGc(workspace, rest.includes('--dry-run')).join('\n')}`
+			);
+			return;
+		}
+		if (sub === 'checkpoint') {
+			const workspace = requireWorkspace();
+			const parsed = splitArgs(rest);
+			const id = sessionId(workspace, parsed);
+			const db = openJournal(workspace);
+			try {
+				checkpointEvent(db, {
+					workspace,
+					sessionId: id,
+					done: parsed.options.get('--done')?.join(' '),
+					next: parsed.options.get('--next')?.join(' '),
+					blocked: parsed.options.get('--blocked')?.join(' ')
+				});
+			} finally {
+				db.close();
+			}
+			console.log('agent-log: checkpoint recorded');
+			return;
+		}
+		if (sub === 'guard') {
+			const workspace = requireWorkspace();
+			const parsed = splitArgs(rest);
+			const command = parsed.trailing;
+			if (command.length === 0) die(`guard needs a command after '--'\n${USAGE}`);
+			const outcome = guardCommand(
+				workspace,
+				command,
+				parsed.options.get('--scope') ?? [],
+				parsed.options.get('--session')?.[0]
+			);
+			if (outcome.block) die(outcome.reason ?? 'guard blocked');
+			const child = Bun.spawn(command, { stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' });
+			const exitCode = await child.exited;
+			guardFinished(
+				workspace,
+				parsed.options.get('--session')?.[0],
+				command,
+				parsed.options.get('--scope') ?? [],
+				exitCode
+			);
+			process.exit(exitCode);
 		}
 		// agent-log's option parser requires values after every flag — strip the
 		// value-less --json before it ever sees the args.
@@ -61,17 +153,12 @@ export const agentLog: Command = {
 		const parsed = splitArgs(rest.filter((arg) => arg !== '--json'));
 		if (sub === 'status') {
 			const workspace = requireWorkspace();
-			const actor = boundaryActor(workspace.root);
-			const data = gatherStatus(
-				workspace,
-				sessionIdFor(workspace, actor, parsed.options.get('--session')?.[0])
-			);
+			const data = gatherStatus(workspace, sessionId(workspace, parsed));
 			console.log(asJson ? JSON.stringify(data) : renderStatus(data, Date.now()));
 			return;
 		}
 		if (sub === 'claim') {
 			const workspace = requireWorkspace();
-			const actor = boundaryActor(workspace.root);
 			const rationale = parsed.trailing.join(' ');
 			const scopes = parsed.positional;
 			if (scopes.length === 0) die(`claim needs at least one scope\n${USAGE}`);
@@ -79,12 +166,13 @@ export const agentLog: Command = {
 			try {
 				const result = claimScopes({
 					workspace,
-					sessionId: sessionIdFor(workspace, actor, parsed.options.get('--session')?.[0]),
-					actor,
+					sessionId: sessionId(workspace, parsed),
+					actor: boundaryActor(workspace.root),
 					scopes,
 					rationale,
 					ttlMs: parseDuration(parsed.options.get('--ttl')?.[0] ?? '20m'),
-					taskId: parsed.options.get('--task')?.[0]
+					taskId: parsed.options.get('--task')?.[0],
+					force: rest.includes('--force')
 				});
 				if (!result.ok) {
 					for (const conflict of result.conflicts)
@@ -103,13 +191,18 @@ export const agentLog: Command = {
 		}
 		if (sub === 'release') {
 			const workspace = requireWorkspace();
-			const actor = boundaryActor(workspace.root);
-			const released = releaseScopes(
-				workspace,
-				sessionIdFor(workspace, actor, parsed.options.get('--session')?.[0]),
-				parsed.positional
-			);
+			const released = releaseScopes(workspace, sessionId(workspace, parsed), parsed.positional);
 			console.log(`agent-log: released ${released} lease(s)`);
+			return;
+		}
+		if (sub === 'renew') {
+			const workspace = requireWorkspace();
+			const renewed = renewLeases(
+				workspace,
+				sessionId(workspace, parsed),
+				parseDuration(parsed.options.get('--ttl')?.[0] ?? '20m')
+			);
+			console.log(`agent-log: renewed ${renewed} lease(s)`);
 			return;
 		}
 		if (sub === 'recent') return recent(parsed.options, asJson);

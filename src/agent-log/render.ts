@@ -12,12 +12,14 @@ export function visibleRows(options: Options): EventRow[] {
 		? rows.filter((row) => (JSON.parse(row.scopes) as string[]).includes(scope))
 		: rows;
 	// The latest handoff is always visible (it's the durable session baton);
-	// older handoffs age out on the same --since window as ends.
+	// older handoffs age out on the same --since window as ends and transitions.
 	const latestHandoff = scoped.findLast((row) => row.kind === 'handoff');
 	return scoped.filter((row) => {
 		if (row.kind === 'intent') return !ended.has(row.op_id) && (row.expires_ms ?? 0) >= now;
 		if (row.kind === 'handoff') return row === latestHandoff || row.at_ms >= since;
-		return row.kind === 'end' ? row.at_ms >= since : (row.expires_ms ?? 0) >= now;
+		return row.kind === 'end' || row.kind === 'transition'
+			? row.at_ms >= since
+			: (row.expires_ms ?? 0) >= now;
 	});
 }
 

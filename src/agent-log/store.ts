@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { migrate } from './schema';
 import { mirrorEvent } from './mirror';
 
-export type EventKind = 'intent' | 'finding' | 'end' | 'handoff';
+export type EventKind = 'intent' | 'finding' | 'end' | 'handoff' | 'transition';
 export type EventRow = {
 	at_ms: number;
 	kind: EventKind;

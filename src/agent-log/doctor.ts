@@ -1,7 +1,8 @@
 /**
- * `agent-log doctor` — diagnostics for the state foundation: schema version,
- * stale sessions, expired (crash) leases, unresolved aliases, missing members,
- * and clock skew. Report-only; the only write is the idempotent migration.
+ * `agent-log doctor` — diagnostics: schema version, hook coverage, stale
+ * sessions, expired leases, unresolved aliases, missing members, clock skew,
+ * and last-24h telemetry (the Phase 2 false-positive measurement). Report-only;
+ * the only write is the idempotent migration.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import { Database } from 'bun:sqlite';
 import type { Workspace } from './project';
 import { journalPath, openJournal, SCHEMA_VERSION } from './schema';
 import { expandAliases, normalizeScope, ScopeError } from './scopes';
+import { EXPECTED_HOOKS, hookCoverage } from './hooks';
 
 const STALE_SESSION_MS = 24 * 3_600_000;
 const CLOCK_SKEW_MS = 5 * 60_000;
@@ -35,6 +37,21 @@ export function runDoctor(workspace: Workspace): DoctorReport {
 	} else {
 		issues.push(`schema v${schemaVersion} — migrates to v${SCHEMA_VERSION} on first claim`);
 		lines.push(`  schema:    v${schemaVersion} (will migrate to v${SCHEMA_VERSION})`);
+	}
+
+	const { installed, missing } = hookCoverage();
+	const coordinationExpected = workspace.mode === 'warn' || workspace.mode === 'enforce';
+	lines.push(
+		installed.length === 0
+			? `  hooks:     none installed in ~/.claude/settings.json`
+			: `  hooks:     ${installed.length}/${Object.keys(EXPECTED_HOOKS).length} installed (${installed.join(', ')})`
+	);
+	if (missing.length > 0) {
+		lines.push(`    missing:  ${missing.join(', ')}`);
+		if (coordinationExpected)
+			issues.push(
+				`${missing.length} hook(s) missing while mode is ${workspace.mode} — run 'atlas prime --install-hook'`
+			);
 	}
 
 	if (!(MODES as string[]).includes(workspace.mode))
@@ -101,9 +118,21 @@ export function runDoctor(workspace: Workspace): DoctorReport {
 		);
 		const expired = leases.filter((lease) => lease.expires_ms <= now);
 		const future = leases.filter((lease) => lease.heartbeat_ms > now + CLOCK_SKEW_MS);
+		const dayAgo = now - 24 * 3_600_000;
+		const telemetryCount = (
+			db.query('SELECT COUNT(*) AS n FROM telemetry WHERE at_ms > ?').get(dayAgo) as { n: number }
+		).n;
+		const deniedCount = (
+			db
+				.query(
+					"SELECT COUNT(*) AS n FROM telemetry WHERE at_ms > ? AND name = 'PreToolUse' AND payload LIKE '%\"denied\":true%'"
+				)
+				.get(dayAgo) as { n: number }
+		).n;
 		lines.push(`  sessions:  ${sessions.length} active · ${stale.length} stale`);
 		lines.push(`  leases:    ${leases.length - expired.length} active · ${expired.length} expired`);
 		lines.push(`  tasks:     ${taskSessions.size} with open tasks`);
+		lines.push(`  telemetry: ${telemetryCount} hook event(s) · ${deniedCount} denied check(s) in 24h`);
 		if (stale.length) {
 			issues.push(`${stale.length} stale session(s): ${stale.map((s) => s.actor).join(', ')}`);
 		}

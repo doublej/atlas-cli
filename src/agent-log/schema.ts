@@ -1,14 +1,15 @@
 /**
  * Versioned SQLite schema. `events` stays the audit trail (v1, unchanged shape);
- * v2 adds the explicit state model: `sessions`, `tasks`, and renewable `leases`.
- * Both live in the same journal file per boundary.
+ * v2 added the explicit state model (`sessions`, `tasks`, `leases`); v3 adds
+ * subagent parentage + session close columns, per-worktree leases, and the two
+ * support tables: short-retention `telemetry` and retry-proof `processed`.
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { Database } from 'bun:sqlite';
 import type { Workspace } from './project';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type SessionRow = {
 	id: string;
@@ -18,6 +19,8 @@ export type SessionRow = {
 	last_heartbeat: number;
 	status: string;
 	meta: string;
+	parent_id: string | null;
+	closed_at: number | null;
 };
 
 export type TaskRow = {
@@ -42,9 +45,10 @@ export type LeaseRow = {
 	heartbeat_ms: number;
 	expires_ms: number;
 	rationale: string;
+	worktree: string;
 };
 
-const DDL = `
+const BASE_DDL = `
 CREATE TABLE IF NOT EXISTS events (
 	seq INTEGER PRIMARY KEY, at_ms INTEGER NOT NULL, kind TEXT NOT NULL, op_id TEXT NOT NULL,
 	operation TEXT NOT NULL, actor TEXT NOT NULL, bead TEXT NOT NULL, scopes TEXT NOT NULL,
@@ -53,7 +57,8 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS sessions (
 	id TEXT PRIMARY KEY, boundary_id TEXT NOT NULL, actor TEXT NOT NULL,
 	started_at INTEGER NOT NULL, last_heartbeat INTEGER NOT NULL,
-	status TEXT NOT NULL DEFAULT 'active', meta TEXT NOT NULL DEFAULT '{}'
+	status TEXT NOT NULL DEFAULT 'active', meta TEXT NOT NULL DEFAULT '{}',
+	parent_id TEXT, closed_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS tasks (
 	id TEXT PRIMARY KEY, session_id TEXT NOT NULL, boundary_id TEXT NOT NULL,
@@ -65,10 +70,32 @@ CREATE TABLE IF NOT EXISTS leases (
 	scope_type TEXT NOT NULL, normalized TEXT NOT NULL, session_id TEXT NOT NULL,
 	task_id TEXT NOT NULL, generation INTEGER NOT NULL, heartbeat_ms INTEGER NOT NULL,
 	expires_ms INTEGER NOT NULL, rationale TEXT NOT NULL,
+	worktree TEXT NOT NULL DEFAULT '',
 	UNIQUE(boundary_id, session_id, normalized)
 );
+CREATE TABLE IF NOT EXISTS telemetry (
+	id INTEGER PRIMARY KEY, at_ms INTEGER NOT NULL, session_id TEXT NOT NULL,
+	hook TEXT NOT NULL, name TEXT NOT NULL, payload TEXT NOT NULL, ttl_ms INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS processed (
+	key TEXT PRIMARY KEY, at_ms INTEGER NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_leases_boundary ON leases(boundary_id);
+CREATE INDEX IF NOT EXISTS idx_telemetry_at ON telemetry(at_ms);
 `;
+
+/** v2 -> v3: add the state columns the v2 tables were missing. */
+const V3_ALTERS = [
+	'ALTER TABLE sessions ADD COLUMN parent_id TEXT',
+	'ALTER TABLE sessions ADD COLUMN closed_at INTEGER',
+	'ALTER TABLE leases ADD COLUMN worktree TEXT NOT NULL DEFAULT \'\''
+];
+
+function hasColumn(db: Database, table: string, column: string): boolean {
+	return (db.query(`PRAGMA table_info(${table})`).all() as { name: string }[]).some(
+		(row) => row.name === column
+	);
+}
 
 /** Idempotent migration to SCHEMA_VERSION. Never downgrades. */
 export function migrate(db: Database): void {
@@ -78,7 +105,13 @@ export function migrate(db: Database): void {
 		throw new Error(
 			`agent-log: database schema v${version} is newer than supported v${SCHEMA_VERSION}`
 		);
-	db.exec(DDL);
+	if (version === 2) {
+		for (const alter of V3_ALTERS) {
+			const [table, column] = alter.match(/ALTER TABLE (\w+) ADD COLUMN (\w+)/)!.slice(1);
+			if (!hasColumn(db, table, column)) db.exec(alter);
+		}
+	}
+	db.exec(BASE_DDL);
 	db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
