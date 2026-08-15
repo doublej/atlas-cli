@@ -36,9 +36,16 @@ export async function shellExec(line: string): Promise<void> {
 
 const daemonTarget = () => `gui/${process.getuid?.() ?? 0}/com.jurrejan.atlas-api`;
 
-/** Nudge the atlas-api launchd daemon back to life (no-op if it isn't loaded). */
+/**
+ * Nudge the atlas-api launchd daemon back to life (no-op if it isn't loaded).
+ *
+ * Deliberately no `-k`: that SIGKILLs the job even when it is alive and merely slow to
+ * answer, which is how a booting server got killed on every poll and never converged.
+ * Plain `kickstart` starts a dead job and leaves a live one alone; the plist's
+ * `KeepAlive` already restarts anything that actually exits.
+ */
 async function kickstart(): Promise<void> {
-	await Bun.spawn(['launchctl', 'kickstart', '-k', daemonTarget()], {
+	await Bun.spawn(['launchctl', 'kickstart', daemonTarget()], {
 		stdout: 'ignore',
 		stderr: 'ignore'
 	}).exited;

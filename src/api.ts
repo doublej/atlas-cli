@@ -1,10 +1,16 @@
 // Thin client to the project-atlas API. Override the host with ATLAS_API.
 export const API_BASE = process.env.ATLAS_API ?? 'http://localhost:47891';
 
-/** Is atlas-api reachable right now? (1s timeout, never throws.) */
+/**
+ * Is atlas-api reachable right now? (2s timeout, never throws.)
+ *
+ * Hits `/api/health`, not `/` — the answer must mean "the process is serving", not
+ * "the UI renders". Health-checking the root page made every consumer restart the
+ * daemon whenever a Svelte route threw a 500, or whenever rendering took >1s.
+ */
 export async function isUp(): Promise<boolean> {
 	try {
-		const r = await fetch(`${API_BASE}/`, { signal: AbortSignal.timeout(1000) });
+		const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(2000) });
 		return r.ok;
 	} catch {
 		return false;
