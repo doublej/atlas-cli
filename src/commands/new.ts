@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import type { Command } from '../types';
 import { apiGet, apiPost, isUp } from '../api';
 import { bootstrapJournal } from '../agent-log/init';
+import { bootstrapFlow } from './flow';
 import { getCategoryTemplates } from '../../../shared/templates';
 import { DEV_FOLDER, discoverTemplates, templatesDir, type Template } from '../template-discovery';
 import { pickCategory, pickOutputDir, pickTemplate, type Category } from '../new-prompts';
@@ -94,6 +95,7 @@ async function finish(target: string, startedAtMs: number, code: number): Promis
 			/* the journal is a nicety — scaffolding already succeeded */
 		}
 	}
+	if (created) await bootstrapFlow(created);
 	await refresh();
 	if (created) await handOff(created);
 }
