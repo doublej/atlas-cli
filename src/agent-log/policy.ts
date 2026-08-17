@@ -1,7 +1,12 @@
 /** Static assets for `agent-log init`: the ./agent-log shim and the CLAUDE.md policy block. */
 import { OPERATIONS } from './args';
 
-export const SHIM_CONTENT = '#!/bin/sh\nexec atlas agent-log "$@"\n';
+export const ATLAS_REPO = 'https://github.com/doublej/project-atlas';
+
+export const SHIM_CONTENT = `#!/bin/sh
+# Shipped by project-atlas — ${ATLAS_REPO}
+exec atlas agent-log "$@"
+`;
 
 export const MARKER = '<!-- agent-log:policy -->';
 
