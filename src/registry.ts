@@ -8,6 +8,7 @@ import { run } from './commands/run';
 import { pick } from './commands/pick';
 import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
+import { templates } from './commands/templates';
 import { flow } from './commands/flow';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
@@ -25,6 +26,7 @@ export const COMMANDS: Command[] = [
 	jump,
 	search,
 	ports,
+	templates,
 	flow,
 	agentLog,
 	prime,
