@@ -52,6 +52,7 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 | `tree search <q> [path]` | ✅ | case-insensitive search across every CLAUDE.md in the tree |
 | `tree compose [path]` | ✅ | concatenate the ancestor→project chain — the loaded context, as one md doc (always `&up=1`; the chain *is* the up graph) |
 | `tree web [path]` | ✅ | opens `/claude-tree?root=<path\|cwd>`; cookiecutter recipes call this |
+| `info [path] [--json]` | ✅ | atlas's record for the current project (stack, port, branch/flow, scripts, deploy, domains, umami, beads, sessions). Resolves the nearest owning project from a subfolder; `--json` prints the raw `Project` |
 | `init` | ✅ | writes a starter `.atlas` (replaces the old `atlas-init` zsh fn) |
 | `new` | ✅ | scaffold a project: pick category (`/api/categories`) → template (`/api/templates`) → `cookiecutter`, then `POST /api/refresh`. Offline: local glob via `template-discovery.ts` + free-text category. Non-interactive: `atlas new <family/name> --name <n> --category <cat>\|--out <dir> [--var k=v ...]` (runs `cookiecutter --no-input`; agent-friendly). Ends inside the new project via the `shell/atlas.zsh` wrapper |
 | `scan` | ✅ | `POST /api/refresh`, prints project/framework counts |

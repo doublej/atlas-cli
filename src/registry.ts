@@ -1,6 +1,7 @@
 import type { Command } from './types';
 import { tree } from './commands/tree';
 import { init } from './commands/init';
+import { info } from './commands/info';
 import { newProject } from './commands/new';
 import { scan } from './commands/scan';
 import { open } from './commands/open';
@@ -18,6 +19,7 @@ import { banner } from './logo';
 export const COMMANDS: Command[] = [
 	tree,
 	init,
+	info,
 	newProject,
 	scan,
 	open,
