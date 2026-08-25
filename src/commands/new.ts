@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -86,16 +85,16 @@ async function finish(target: string, startedAtMs: number, code: number): Promis
 		return;
 	}
 	const created = await findCreatedDir(target, startedAtMs);
-	// Template post-gen hooks run `atlas agent-log init` themselves; the shim's presence
-	// marks that. Only bootstrap here for templates without the hook.
-	if (created && !existsSync(join(created, 'agent-log'))) {
+	// Git first: template post-gen hooks run `atlas agent-log init` before the repo exists,
+	// so the journal db is only warmed here. bootstrapJournal is idempotent.
+	if (created) {
+		await bootstrapFlow(created);
 		try {
 			bootstrapJournal(created);
 		} catch {
 			/* the journal is a nicety — scaffolding already succeeded */
 		}
 	}
-	if (created) await bootstrapFlow(created);
 	await refresh();
 	if (created) await handOff(created);
 }

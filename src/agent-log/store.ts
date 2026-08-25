@@ -26,23 +26,24 @@ function git(args: string[]): string {
 	return result.exitCode === 0 ? result.stdout.toString().trim() : '';
 }
 
-function databasePath(): string {
+function databasePath(cwd?: string): string {
 	if (process.env.ATLAS_AGENT_LOG_PATH) return process.env.ATLAS_AGENT_LOG_PATH;
-	const commonDir = git(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+	const at = cwd ? ['-C', cwd] : [];
+	const commonDir = git([...at, 'rev-parse', '--path-format=absolute', '--git-common-dir']);
 	if (!commonDir) throw new Error('agent-log: run inside a git repository');
 	return resolve(commonDir, 'agent-log.sqlite');
 }
 
-function openDatabase(): Database {
-	const db = new Database(databasePath(), { create: true });
+function openDatabase(cwd?: string): Database {
+	const db = new Database(databasePath(cwd), { create: true });
 	db.exec('PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL');
 	migrate(db);
 	return db;
 }
 
 /** Best-effort db creation for `agent-log init`; the store also creates lazily on first write. */
-export function warmDatabase(): void {
-	openDatabase().close();
+export function warmDatabase(cwd?: string): void {
+	openDatabase(cwd).close();
 }
 
 export function contextDetail(extra: Record<string, unknown> = {}): string {

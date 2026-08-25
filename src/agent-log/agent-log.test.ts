@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MARKER, SHIM_CONTENT } from './policy';
@@ -172,7 +172,7 @@ describe('agent-log init', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'atlas-agent-log-plain-'));
 		const result = invoke(['init'], dir);
 		expect(result.exitCode).toBe(0);
-		expect(result.stdout.toString()).toContain('created on first use');
+		expect(existsSync(join(dir, '.git'))).toBe(false);
 		expect(readFileSync(join(dir, 'agent-log'), 'utf8')).toBe(SHIM_CONTENT);
 		rmSync(dir, { recursive: true, force: true });
 	});

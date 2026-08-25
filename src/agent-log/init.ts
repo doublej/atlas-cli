@@ -38,11 +38,8 @@ function ensurePolicyBlock(cwd: string): void {
 }
 
 function warmJournalDb(cwd: string): void {
-	if (!isGitRepo(cwd)) {
-		console.log('agent-log: not a git repository — journal db is created on first use');
-		return;
-	}
-	warmDatabase();
+	if (!isGitRepo(cwd)) return; // no repo yet — the store creates the db on first write
+	warmDatabase(cwd);
 }
 
 /** Never throws for the expected non-git case; scaffolding must not fail on this. */
