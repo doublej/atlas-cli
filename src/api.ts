@@ -12,8 +12,12 @@ export async function isUp(): Promise<boolean> {
 	try {
 		const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(2000) });
 		return r.ok;
-	} catch {
-		return false;
+	} catch (err) {
+		// A timeout counts as up: the daemon answers health in ~20ms, so blowing 2s means the
+		// machine is loaded, not that the process died, and a dead one refuses the connection
+		// instantly rather than hanging. Counting slow as dead is what made `atlas scan` announce
+		// "atlas-api isn't running" at a daemon with a day of uptime, kickstart it, then die.
+		return (err as Error)?.name === 'TimeoutError';
 	}
 }
 
