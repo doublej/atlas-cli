@@ -3,7 +3,6 @@
  * (`--unattended`) and scheduled (`--scheduled`, set by the launchd jobs) runs never ask —
  * an item without approval is refused with the approval it needs, and the batch continues.
  */
-import { confirm as ask } from '@inquirer/prompts';
 import type { Flags } from './flags';
 import { setActor } from './oplog';
 import type { Settings } from './settings';
@@ -63,6 +62,8 @@ export function policy(op: Operation, mode: Mode, s: Settings, flags: Flags): Ve
 /** Ask y/N on a terminal. With no terminal there is nobody to ask: that is a "no". */
 export async function confirm(message: string): Promise<boolean> {
 	if (!process.stdin.isTTY) return false;
+	// Lazy: importing @inquirer/prompts at load time cuts piped stdout off at 64 KB.
+	const { confirm: ask } = await import('@inquirer/prompts');
 	return ask({ message, default: false });
 }
 

@@ -4,10 +4,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { writeJsonAtomic } from './fsutil';
 
-/** `ATLAS_DISK_HOME` moves everything (tests, a second profile). */
-export const STATE_DIR =
+/**
+ * `ATLAS_DISK_HOME` moves everything (tests, a second profile). Read on every call: bun test
+ * shares one module cache across test files, and each file points it at its own scratch dir.
+ */
+export const stateDir = (): string =>
 	process.env.ATLAS_DISK_HOME ?? join(homedir(), 'Library', 'Application Support', 'atlas-disk');
-export const statePath = (name: string): string => join(STATE_DIR, name);
+export const statePath = (name: string): string => join(stateDir(), name);
 
 export interface Schedule {
 	enabled: boolean;
@@ -66,7 +69,7 @@ export const DEFAULTS: Settings = {
 };
 
 export function ensureStateDir(): void {
-	mkdirSync(STATE_DIR, { recursive: true });
+	mkdirSync(stateDir(), { recursive: true });
 }
 
 export function loadSettings(): Settings {

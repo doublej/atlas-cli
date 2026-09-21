@@ -43,6 +43,7 @@ describe('trim runner', () => {
 			{ name: 'hangs', op: 'trim' as const, needs: ['sleep'], cmd: ['sleep', '999'], cache: scratch },
 			{ name: 'ok', op: 'trim' as const, needs: ['true'], cmd: ['true'] }
 		];
+		const before = readLog().filter((r) => r.t === 'start').length;
 		const items = await runSteps(steps, 0.5);
 		expect(items.map((i) => i.outcome)).toEqual(['skipped', 'failed', 'failed', 'done']);
 		expect(items[0].reason).toContain('not installed: no-such-tool-xyz');
@@ -50,7 +51,7 @@ describe('trim runner', () => {
 		expect(items[2].timedOut).toBe(true);
 		expect(items[2].reason).toMatch(/timed out after 0.5s.*cache/);
 		expect(pending()).toHaveLength(0);
-		expect(readLog().filter((r) => r.t === 'start')).toHaveLength(4);
+		expect(readLog().filter((r) => r.t === 'start').length - before).toBe(4);
 	});
 });
 
