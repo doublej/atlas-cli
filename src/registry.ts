@@ -14,6 +14,7 @@ import { flow } from './commands/flow';
 import { hosts } from './commands/hosts';
 import { hostnames } from './commands/hostnames';
 import { services } from './commands/services';
+import { disk } from './commands/disk';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
 import { brief } from './commands/brief';
@@ -38,6 +39,7 @@ export const COMMANDS: Command[] = [
 	hosts,
 	hostnames,
 	services,
+	disk,
 	agentLog,
 	brief,
 	installAutocompletion
