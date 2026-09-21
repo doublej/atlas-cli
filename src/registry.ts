@@ -15,10 +15,12 @@ import { hosts } from './commands/hosts';
 import { hostnames } from './commands/hostnames';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
+import { brief } from './commands/brief';
 import { installAutocompletion } from './commands/install-autocompletion';
 import { banner } from './logo';
 
 export const COMMANDS: Command[] = [
+	prime,
 	tree,
 	init,
 	info,
@@ -35,7 +37,7 @@ export const COMMANDS: Command[] = [
 	hosts,
 	hostnames,
 	agentLog,
-	prime,
+	brief,
 	installAutocompletion
 ];
 

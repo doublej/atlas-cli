@@ -1,7 +1,7 @@
-// Pure renderer for `atlas prime` — no API, no I/O (tree-format.ts pattern).
-// The command gathers PrimeData from local sources; this module only formats it.
+// Pure renderer for `atlas brief` — no API, no I/O (tree-format.ts pattern).
+// The command gathers BriefData from local sources; this module only formats it.
 
-export interface PrimeData {
+export interface BriefData {
 	project: string;
 	session?: { count: number; lastAt: string; sessionId: string; summary?: string };
 	handoff?: { summary: string; atMs: number; auto: boolean };
@@ -32,9 +32,9 @@ export function formatAge(thenMs: number, nowMs: number): string {
 }
 
 /** Session briefing block — absent sections are simply omitted. */
-export function renderPrime(data: PrimeData, nowMs: number): string {
+export function renderBrief(data: BriefData, nowMs: number): string {
 	const age = (ms: number): string => formatAge(ms, nowMs);
-	const lines = [`atlas prime — ${data.project}`];
+	const lines = [`atlas brief — ${data.project}`];
 	if (data.session) {
 		const s = data.session;
 		const summary = s.summary ? ` · ${s.summary}` : '';
@@ -66,5 +66,6 @@ export function renderPrime(data: PrimeData, nowMs: number): string {
 		const stale = data.claudeMd.staleSinceSessions ? ' — stale vs recent sessions' : '';
 		lines.push(`  claude.md: ~${fmtTokens(data.claudeMd.tokens)} tokens · ${edited}${stale}`);
 	}
+	lines.push('  primer:    `atlas prime` — commands, workflows, guardrails');
 	return lines.join('\n');
 }

@@ -50,7 +50,7 @@ export function runDoctor(workspace: Workspace): DoctorReport {
 		lines.push(`    missing:  ${missing.join(', ')}`);
 		if (coordinationExpected)
 			issues.push(
-				`${missing.length} hook(s) missing while mode is ${workspace.mode} — run 'atlas prime --install-hook'`
+				`${missing.length} hook(s) missing while mode is ${workspace.mode} — run 'atlas brief --install-hook'`
 			);
 	}
 

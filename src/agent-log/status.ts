@@ -4,7 +4,7 @@
  * (latest handoff). Reads state, never writes. `recent` stays the forensic view.
  */
 import { basename } from 'node:path';
-import { formatAge } from '../prime-format';
+import { formatAge } from '../brief-format';
 import type { Workspace } from './project';
 import { activeLeases, sessionActor } from './sessions';
 import { openJournal, type SessionRow, type TaskRow } from './schema';
