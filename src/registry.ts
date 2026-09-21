@@ -13,6 +13,7 @@ import { templates } from './commands/templates';
 import { flow } from './commands/flow';
 import { hosts } from './commands/hosts';
 import { hostnames } from './commands/hostnames';
+import { services } from './commands/services';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
 import { brief } from './commands/brief';
@@ -36,6 +37,7 @@ export const COMMANDS: Command[] = [
 	flow,
 	hosts,
 	hostnames,
+	services,
 	agentLog,
 	brief,
 	installAutocompletion
