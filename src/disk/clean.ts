@@ -7,7 +7,7 @@
 import { dirname, resolve } from 'node:path';
 import { approve, isCancelled, modeOf, policy, trapCancel, type Mode } from './approval';
 import { deletePermanent, recheck, trashPath } from './clean-delete';
-import { pickFolders, planText, preview } from './clean-pick';
+import { pickFolders, planText, previewData, previewText, type Preview } from './clean-pick';
 import { parseFlags, type Flags } from './flags';
 import { freeBytes, human, writeJsonAtomic } from './fsutil';
 import { acquire } from './lock';
@@ -40,10 +40,14 @@ async function select(all: FolderRow[], f: Flags, mode: Mode): Promise<{ rows: F
 }
 
 /** Unattended: the policy per risk, and in-use folders are skipped. Interactive: one confirmation. */
-async function gate(rows: FolderRow[], mode: Mode, s: Settings, f: Flags, toTrash: (r: FolderRow) => boolean): Promise<{ go: FolderRow[]; out: ItemReport[] }> {
+async function gate(rows: FolderRow[], mode: Mode, s: Settings, f: Flags, toTrash: (r: FolderRow) => boolean, previews: Preview[]): Promise<{ go: FolderRow[]; out: ItemReport[] }> {
 	if (mode === 'interactive') {
-		for (const r of rows) console.log(`${await preview(r)}\n`);
-		console.log(planText(rows, toTrash));
+		for (const r of rows) previews.push(await previewData(r));
+		// With --json the previews travel in `data.preview` instead (a UI shows them before it confirms).
+		if (!f.has('json')) {
+			for (const [i, r] of rows.entries()) console.log(`${previewText(r, previews[i])}\n`);
+			console.log(planText(rows, toTrash));
+		}
 		if (f.has('dry-run')) return { go: rows, out: [] };
 		const ok = await approve(policy('clean-rebuildable', mode, s, f), `Delete these ${rows.length} folder(s)?`);
 		return ok === true ? { go: rows, out: [] } : { go: [], out: rows.map((r) => refuse(r, 'not approved', ok.refuse)) };
@@ -107,11 +111,12 @@ export async function run(args: string[]): Promise<Report> {
 	if (typeof picked === 'string') return { command: 'clean', exit: 'refused', text: picked };
 	const rows = dropCovered(picked.rows);
 	const toTrash = (r: FolderRow) => f.has('trash') || (r.risk === 'review' && !f.has('permanent'));
-	const { go, out } = rows.length ? await gate(rows, mode, loadSettings(), f, toTrash) : { go: [], out: [] };
+	const preview: Preview[] = [];
+	const { go, out } = rows.length ? await gate(rows, mode, loadSettings(), f, toTrash, preview) : { go: [], out: [] };
 	const items = [...picked.refused, ...out];
 	if (f.has('dry-run')) {
 		items.push(...go.map((r) => skip(r, `dry run — would ${toTrash(r) ? 'move to the Trash' : 'delete'} ${human(r.bytes)}`)));
-		return { command: 'clean', items, data: { scanRanAt: scan.ranAt }, exit: items.some((i) => i.outcome === 'refused') ? undefined : 'ok' };
+		return { command: 'clean', items, data: { scanRanAt: scan.ranAt, preview }, exit: items.some((i) => i.outcome === 'refused') ? undefined : 'ok' };
 	}
 	const holder = go.length ? acquire('clean') : null;
 	if (holder) return { command: 'clean', items: [...items, ...go.map((r) => refuse(r, `another job is running: ${holder.job} (pid ${holder.pid})`))] };

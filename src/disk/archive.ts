@@ -1,6 +1,7 @@
 /**
  * `atlas disk archive (--eligible | <category/project>…) [--dry-run] [--unattended]
- *   [--include-dirty] [--keep-rebuildable] [--compression none|fast|strong|<1-19>] [--to DIR]`
+ *   [--include-dirty] [--keep-rebuildable] [--compression none|fast|strong|<1-19>] [--to DIR]
+ *   [--confirmed [--confirm-dirty <category/project>]…]`
  */
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -49,6 +50,9 @@ function planText(plan: ProjectRow[], o: ArchiveOpts): string {
 	return [`Archive plan → ${o.archiveDir} (compression ${o.compression || 'none'}):`, ...rows, `  frees up to ${human(total)} on this Mac (archives stay local until uploaded and evicted)`].join('\n');
 }
 
+/** A UI confirms each dirty project on its own: only the ids passed as `--confirm-dirty` go. */
+const confirmedDirty = (id: string, f: Flags): true | { refuse: string } => (f.all('confirm-dirty').includes(id) ? true : { refuse: 'its own confirmation' });
+
 /** Split the plan into approved projects and refused items, asking where the policy says to. */
 async function approvePlan(plan: ProjectRow[], mode: Mode, s: Settings, f: Flags) {
 	const refused: ItemReport[] = [];
@@ -56,7 +60,7 @@ async function approvePlan(plan: ProjectRow[], mode: Mode, s: Settings, f: Flags
 	if (whole !== true) return { go: [], refused: plan.map((p) => ({ item: p.id, outcome: 'refused' as const, needs: whole.refuse })) };
 	const go: ProjectRow[] = [];
 	for (const p of plan) {
-		const ok = risky(p) ? await approve(policy('archive-dirty', mode, s, f), `${p.id} has uncommitted or unpushed work. Archive it anyway?`) : true;
+		const ok = !risky(p) ? true : mode === 'interactive' && f.has('confirmed') ? confirmedDirty(p.id, f) : await approve(policy('archive-dirty', mode, s, f), `${p.id} has uncommitted or unpushed work. Archive it anyway?`);
 		if (ok === true) go.push(p);
 		else refused.push({ item: p.id, outcome: 'refused', reason: 'uncommitted or unpushed work', needs: ok.refuse });
 	}

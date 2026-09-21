@@ -14,6 +14,7 @@ import { run as doctor } from '../disk/doctor';
 import { run as config } from '../disk/config-cmd';
 import { run as log } from '../disk/log-cmd';
 import { run as tui } from '../disk/tui';
+import { run as job } from '../disk/job';
 
 const SUBCOMMANDS: Record<string, [(args: string[]) => Promise<Report>, string]> = {
 	analyze: [analyze, 'projects under the dev folder: size, age, state, git [--min-size MB] [--cached]'],
@@ -28,7 +29,8 @@ const SUBCOMMANDS: Record<string, [(args: string[]) => Promise<Report>, string]>
 	log: [log, 'operation log [--run ID] [--pending]; record manual steps: trash|move|run|skip|note'],
 	config: [config, 'thresholds, rules, locations: get [key] | set <key> <value> | reset <key>'],
 	doctor: [doctor, 'check schedules, archive location, tools and interrupted operations (exit 3 = problems found)'],
-	tui: [tui, 'open the terminal screen (archive-eligible projects ⇄ archive versions)']
+	tui: [tui, 'open the terminal screen (archive-eligible projects ⇄ archive versions)'],
+	job: [job, 'run one subcommand into a log: --log FILE -- <subcommand> … (writes FILE.exit; used by the web console)']
 };
 
 const HELP = `atlas disk — free disk space: archive idle projects, clean rebuildable folders, trim tool caches
@@ -41,11 +43,13 @@ ${Object.entries(SUBCOMMANDS)
 
 Every subcommand takes --json. Changes confirm interactively; --unattended runs only what the
 approval policy allows without a prompt and refuses the rest (with the approval it needs).
+--confirmed means a UI already showed the plan and got a yes (archive: --confirm-dirty <id> per
+dirty project); the policy still refuses what it refuses.
 Exit: 0 ok · 1 error · 2 nothing to do · 3 partly failed · 4 refused.`;
 
 /** "The next run shows it": every disk command warns about interrupted operations first. */
 function warnPending(sub: string): void {
-	if (sub === 'recover') return;
+	if (sub === 'recover' || sub === 'job') return;
 	const open = pending();
 	if (open.length) console.error(`⚠ ${open.length} interrupted operation(s) — see \`atlas disk recover list\`\n`);
 }

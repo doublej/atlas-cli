@@ -18,7 +18,7 @@ const short = (p: string) => p.replace(homedir(), '~');
 /**
  * Chosen approach: `display alert` via osascript. It is the only built-in macOS notification with
  * buttons (`display notification` has none, and alerter/terminal-notifier aren't installed). It is
- * modal, so it gives up after an hour. Review opens Terminal on the cleanup list.
+ * modal, so it gives up after an hour. Review opens the web console's cleanup tab.
  */
 export function notify(reason: string, scan: Scan): void {
 	const top = scan.folders
@@ -30,8 +30,7 @@ export function notify(reason: string, scan: Scan): void {
 		'on run argv',
 		'set r to display alert "Disk space is building up" message (item 1 of argv) buttons {"Dismiss", "Review"} default button "Review" giving up after 3600',
 		'if button returned of r is "Review" then',
-		'tell application "Terminal" to do script "atlas disk clean"',
-		'tell application "Terminal" to activate',
+		'open location "http://localhost:47891/disk?tab=cleanup"',
 		'end if',
 		'end run'
 	].flatMap((l) => ['-e', l]);

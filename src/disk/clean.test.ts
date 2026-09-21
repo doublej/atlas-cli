@@ -160,3 +160,27 @@ describe('notify and manual steps', () => {
 });
 
 process.on('exit', () => rmSync(TMP, { recursive: true, force: true }));
+
+describe('clean --confirmed (a UI showed the plan)', () => {
+	test('--dry-run --json carries each folder’s contents and newest files', async () => {
+		const root = fixture();
+		await scanFixture(root);
+		const dist = join(root, 'dev/web/app/dist');
+		const r = await cleanRun([dist, '--dry-run', '--json', '--confirmed']);
+		const preview = (r.data as { preview: { path: string; entries: string[]; newest: { path: string }[] }[] }).preview;
+		expect(preview).toEqual([{ path: dist, entries: ['app.js'], newest: [expect.objectContaining({ path: 'app.js' })] }]);
+		expect(existsSync(dist)).toBe(true);
+	});
+
+	test('deletes without a terminal, but an unclassified folder is still refused', async () => {
+		const root = fixture();
+		await scanFixture(root);
+		const dist = join(root, 'dev/web/app/dist');
+		const stray = join(root, 'dev/misc/dist');
+		const r = await cleanRun([dist, stray, '--confirmed']);
+		expect(r.items?.find((i) => i.item === dist)?.outcome).toBe('done');
+		expect(r.items?.find((i) => i.item === stray)?.outcome).toBe('refused');
+		expect(existsSync(dist)).toBe(false);
+		expect(existsSync(stray)).toBe(true);
+	});
+});

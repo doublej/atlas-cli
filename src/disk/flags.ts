@@ -11,7 +11,7 @@ export interface Flags {
 export function parseFlags(args: string[], booleans: string[] = []): Flags {
 	const values = new Map<string, string[]>();
 	const positional: string[] = [];
-	const bools = new Set([...booleans, 'json', 'unattended', 'dry-run', 'yes', 'scheduled']);
+	const bools = new Set([...booleans, 'json', 'unattended', 'dry-run', 'yes', 'scheduled', 'confirmed']);
 	for (let i = 0; i < args.length; i++) {
 		const a = args[i];
 		if (!a.startsWith('--')) {

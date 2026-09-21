@@ -2,6 +2,9 @@
  * The approval policy (spec table), in one place. Interactive runs confirm; unattended
  * (`--unattended`) and scheduled (`--scheduled`, set by the launchd jobs) runs never ask —
  * an item without approval is refused with the approval it needs, and the batch continues.
+ * `--confirmed` is interactive mode where a UI (the web console) already showed the plan and
+ * the user said yes: a `confirm` verdict resolves to yes without a terminal. The policy itself
+ * is unchanged — whatever it refuses is still refused.
  */
 import type { Flags } from './flags';
 import { setActor } from './oplog';
@@ -24,7 +27,10 @@ export type Operation =
 /** `confirm` = ask in interactive mode; `allow` = go ahead; `{ refuse }` = the approval it needs. */
 export type Verdict = 'confirm' | 'allow' | { refuse: string };
 
+let confirmedByUi = false;
+
 export function modeOf(flags: Flags): Mode {
+	confirmedByUi = flags.has('confirmed');
 	if (flags.has('scheduled')) {
 		setActor('schedule');
 		return 'scheduled';
@@ -71,6 +77,7 @@ export async function confirm(message: string): Promise<boolean> {
 export async function approve(v: Verdict, question: string): Promise<true | { refuse: string }> {
 	if (v === 'allow') return true;
 	if (v !== 'confirm') return v;
+	if (confirmedByUi) return true;
 	if (!process.stdin.isTTY) return { refuse: 'a confirmation — no terminal; rerun with --unattended where the policy allows it' };
 	return (await confirm(question)) ? true : { refuse: 'your confirmation (declined)' };
 }
