@@ -27,7 +27,7 @@ const SUBCOMMANDS: Record<string, [(args: string[]) => Promise<Report>, string]>
 	recover: [recover, 'interrupted operations: list | finish <op-id> | undo <op-id>'],
 	log: [log, 'operation log [--run ID] [--pending]; record manual steps: trash|move|run|skip|note'],
 	config: [config, 'thresholds, rules, locations: get [key] | set <key> <value> | reset <key>'],
-	doctor: [doctor, 'check schedules, archive location, tools and interrupted operations'],
+	doctor: [doctor, 'check schedules, archive location, tools and interrupted operations (exit 3 = problems found)'],
 	tui: [tui, 'open the terminal screen (archive-eligible projects ⇄ archive versions)']
 };
 

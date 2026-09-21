@@ -73,7 +73,7 @@ export function loadSettings(): Settings {
 	const file = statePath('settings.json');
 	if (!existsSync(file)) return structuredClone(DEFAULTS);
 	const saved = JSON.parse(readFileSync(file, 'utf8')) as Partial<Settings>;
-	return { ...structuredClone(DEFAULTS), ...saved, schedules: { ...DEFAULTS.schedules, ...saved.schedules } };
+	return { ...structuredClone(DEFAULTS), ...saved, schedules: { ...structuredClone(DEFAULTS.schedules), ...saved.schedules } };
 }
 
 export function saveSettings(settings: Settings): void {
