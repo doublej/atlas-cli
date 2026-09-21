@@ -66,6 +66,8 @@ export async function run(args: string[]): Promise<Report> {
 	if (f.has('cached')) {
 		a = loadAnalysis();
 		if (!a) return { command: 'analyze', exit: 'nothing', text: 'No saved analysis — run `atlas disk analyze`.' };
+		// An archived (or moved) project leaves the saved analysis until the next run; drop it now.
+		a = { ...a, projects: a.projects.filter((p) => existsSync(p.path)) };
 		const min = f.num('min-size');
 		if (min !== undefined) a = { ...a, projects: a.projects.filter((p) => p.bytes >= min * 1024 * 1024) };
 	} else a = await analyze(s, f.num('min-size') ?? 0);
