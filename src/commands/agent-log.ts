@@ -57,6 +57,7 @@ function sessionId(workspace: Workspace, parsed: ReturnType<typeof splitArgs>): 
 /** `atlas agent-log <sub>` — the shared agent journal + coordination state. */
 export const agentLog: Command = {
 	name: 'agent-log',
+	usage: HELP,
 	summary: 'shared agent journal — recent/begin/finding/end/run + status/claim/release/renew/checkpoint/guard/hook/gc/doctor',
 	async run(args) {
 		const [sub, ...rest] = args;

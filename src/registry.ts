@@ -11,6 +11,8 @@ import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
 import { templates } from './commands/templates';
 import { flow } from './commands/flow';
+import { hosts } from './commands/hosts';
+import { hostnames } from './commands/hostnames';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
 import { installAutocompletion } from './commands/install-autocompletion';
@@ -30,6 +32,8 @@ export const COMMANDS: Command[] = [
 	ports,
 	templates,
 	flow,
+	hosts,
+	hostnames,
 	agentLog,
 	prime,
 	installAutocompletion

@@ -9,6 +9,10 @@ async function main(): Promise<void> {
 		return;
 	}
 	const cmd = findCommand(name);
+	if (cmd && args.some((a) => a === '--help' || a === '-h')) {
+		console.log(cmd.usage ?? `atlas ${cmd.name} — ${cmd.summary}`);
+		return;
+	}
 	// Not a command → treat the whole arg list as a project search query.
 	await (cmd ? cmd.run(args) : search.run([name, ...args]));
 }

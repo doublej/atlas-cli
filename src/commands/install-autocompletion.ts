@@ -17,7 +17,9 @@ _atlas_projects() {
 	(( $+commands[jq] )) || return 1
 	[[ -r $ATLAS_CACHE ]] || return 1
 	local -a names
-	names=(\${(f)"$(jq -r '.projects[] | select(.archived != true) | .name' -- $ATLAS_CACHE 2>/dev/null)"})
+	# isLocal: the cache also holds Fractal/Ubuntu projects, whose paths do not exist here —
+	# completing them would offer a name that \`atlas jump\` then refuses.
+	names=(\${(f)"$(jq -r '.projects[] | select(.archived != true) | select(.isLocal == true) | .name' -- $ATLAS_CACHE 2>/dev/null)"})
 	(( \${#names} )) && _describe -t projects 'project' names
 }
 

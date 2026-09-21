@@ -1,6 +1,7 @@
 import type { Command } from '../types';
 import { apiGet, apiPost } from '../api';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { die, requireUp, resolveRoot } from '../util';
 import { projectFor, type InfoProject } from './info';
 
@@ -40,6 +41,10 @@ export const run: Command = {
 		const { projects } = await apiGet<{ projects: InfoProject[] }>('/api/projects');
 		const project = projectFor(projects, root);
 		if (!project) die(`No scanned project at ${root}. Run: atlas scan`);
+		if (project.path !== root && ['package.json', 'pyproject.toml', '.atlas'].some((f) => existsSync(join(root, f))))
+			die(
+				`${root} is a project inside ${project.name}, which the scan stops at. Catalog it with a depth entry in ~/dev/.atlas-config.json:\n  "depth": { "${project.relativePath}": ${project.relativePath.split('/').length + 1} }\nthen: atlas scan`
+			);
 		if (!project.devCommand) die(`${project.name} has no dev command atlas can run.`);
 
 		const result = await apiPost<RunResult>('/api/run', {

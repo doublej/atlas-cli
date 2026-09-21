@@ -3,8 +3,9 @@ import { apiGet } from '../api';
 import { die, requireUp, resolveRoot } from '../util';
 
 /** The subset of `Project` (atlas-api/src/lib/scanner.ts) this command prints. */
-interface InfoProject {
+export interface InfoProject {
 	name: string;
+	slug: string;
 	path: string;
 	relativePath: string;
 	description?: string;
@@ -23,6 +24,17 @@ interface InfoProject {
 	umami?: { websiteIds: string[]; instance?: string };
 	beads?: { open: number; inProgress: number; closed: number };
 	claudeSessions?: { lastAt: string; count: number; summary?: string };
+	agentFiles?: { claude?: { tokens: number }; agents?: { tokens: number } };
+	claudeSetup?: {
+		mcpServers?: string[];
+		mcpDisabled?: string[];
+		agents?: number;
+		commands?: number;
+		skills?: number;
+		rules?: number;
+		hooks?: string[];
+		settings?: string[];
+	};
 	archived?: boolean;
 	modifiedAt?: string;
 }
@@ -35,7 +47,36 @@ const ago = (iso: string): string => {
 	return days <= 0 ? 'today' : days === 1 ? '1d ago' : `${days}d ago`;
 };
 
-function render(p: InfoProject): string[] {
+const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
+
+/** `8659` → `~8.7k`. */
+const tokens = (n: number): string => (n >= 1000 ? `~${(n / 1000).toFixed(1)}k` : `~${n}`);
+
+/** One line for the Claude Code setup: context size, then what `.claude/` carries. */
+export function claudeLine(p: InfoProject): string | undefined {
+	const s = p.claudeSetup;
+	const parts = [
+		p.agentFiles?.claude && `CLAUDE.md ${tokens(p.agentFiles.claude.tokens)}`,
+		p.agentFiles?.agents && `AGENTS.md ${tokens(p.agentFiles.agents.tokens)}`,
+		s?.agents && plural(s.agents, 'agent'),
+		s?.commands && plural(s.commands, 'command'),
+		s?.skills && plural(s.skills, 'skill'),
+		s?.rules && plural(s.rules, 'rule'),
+		s?.hooks?.length && `hooks: ${s.hooks.join(', ')}`,
+		s?.settings?.length && `${s.settings.join(' + ')} settings`
+	].filter(Boolean) as string[];
+	return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+/** MCP servers scoped to this project, marking the ones switched off. */
+export function mcpLine(p: InfoProject): string | undefined {
+	const servers = p.claudeSetup?.mcpServers;
+	if (!servers?.length) return undefined;
+	const off = new Set(p.claudeSetup?.mcpDisabled ?? []);
+	return servers.map((n) => (off.has(n) ? `${n} (off)` : n)).join(', ');
+}
+
+function render(p: InfoProject, hostname?: string): string[] {
 	const row = (label: string, value?: string) => (value ? `  ${label.padEnd(12)} ${value}` : '');
 	const stack = [p.type, p.framework, p.runner].filter((v) => v && v !== 'unknown').join(' · ');
 	const flow = p.flow && [p.flow.policy, p.flow.trunk, p.flow.integration].filter(Boolean).join(' → ');
@@ -45,6 +86,7 @@ function render(p: InfoProject): string[] {
 		'',
 		row('stack', stack),
 		row('port', p.port ? String(p.port) : undefined),
+		row('hostname', hostname),
 		row('branch', p.gitBranch && `${p.gitBranch}${p.git === 'dirty' ? ' (dirty)' : ''}`),
 		row('flow', flow && `${flow}${p.flow?.drift ? `  ⚠ ${p.flow.drift}` : ''}`),
 		row('dev', p.devCommand),
@@ -57,6 +99,8 @@ function render(p: InfoProject): string[] {
 			: undefined),
 		row('beads', p.beads && `${p.beads.open} open · ${p.beads.inProgress} in progress · ${p.beads.closed} closed`),
 		row('sessions', p.claudeSessions && `${p.claudeSessions.count} · last ${ago(p.claudeSessions.lastAt)}`),
+		row('claude', claudeLine(p)),
+		row('mcp', mcpLine(p)),
 		row('modified', p.modifiedAt && ago(p.modifiedAt))
 	].filter((line) => line !== '');
 }
@@ -81,6 +125,13 @@ export const info: Command = {
 		const project = projectFor(projects, root);
 		if (!project) die(`No scanned project at ${root}. Run: atlas scan`);
 
-		console.log(json ? JSON.stringify(project, null, 2) : render(project).join('\n'));
+		const hostnames = await apiGet<{ slug: string; local: string }[]>('/api/hostnames').catch(
+			() => []
+		);
+		const hostname = hostnames.find((h) => h.slug === project.slug)?.local;
+
+		console.log(
+			json ? JSON.stringify({ ...project, hostname }, null, 2) : render(project, hostname).join('\n')
+		);
 	}
 };

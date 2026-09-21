@@ -1,9 +1,13 @@
 import { Glob } from 'bun';
-import { homedir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
+import { getPrimaryHost } from '../../shared/hosts';
 
-/** The development monorepo root — where category folders live. */
-export const DEV_FOLDER = join(homedir(), 'Documents', 'development');
+/**
+ * The development monorepo root — where category folders live. Re-exported from the host
+ * registry rather than recomputed, so the CLI and atlas-api can never disagree about which
+ * machine's root they mean.
+ */
+export const DEV_FOLDER = getPrimaryHost().root;
 
 /** Where cookiecutter templates live; mirrors atlas-api's `ATLAS_TEMPLATES_DIR` default. */
 export const templatesDir = (): string =>

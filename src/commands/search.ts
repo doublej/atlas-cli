@@ -1,26 +1,22 @@
 import type { Command } from '../types';
 import { apiGet } from '../api';
+import { findFolder, type Project, rank, rankProjects } from '../ranking';
 import { cdLine, die, requireUp, shellExec } from '../util';
 
-type Project = { name: string; path: string; relativePath: string };
-type Atlas = { projects: Project[] };
+type Atlas = { baseDir: string; projects: Project[]; folders: string[] };
 
-/** Exact name match first, then name prefix, then everything else. */
-const rank = (p: Project, q: string): number =>
-	p.name.toLowerCase() === q ? 0 : p.name.toLowerCase().startsWith(q) ? 1 : 2;
-
-const matches = (p: Project, q: string): boolean =>
-	p.name.toLowerCase().includes(q) || p.relativePath.toLowerCase().includes(q);
+const normalize = (args: string[]): string => {
+	const query = args.join(' ').trim().toLowerCase();
+	if (!query) die('Usage: atlas search <query>');
+	return query;
+};
 
 /** All projects matching the query, best match first. Dies when nothing matches. */
 async function findProjects(args: string[]): Promise<Project[]> {
-	const query = args.join(' ').trim().toLowerCase();
-	if (!query) die('Usage: atlas search <query>');
+	const query = normalize(args);
 	await requireUp();
 	const { projects } = await apiGet<Atlas>('/api/projects');
-	const found = projects
-		.filter((p) => matches(p, query))
-		.sort((a, b) => rank(a, query) - rank(b, query) || a.name.localeCompare(b.name));
+	const found = rankProjects(projects, query);
 	if (found.length === 0) die(`No projects matching "${query}". Run \`atlas help\` for commands.`);
 	return found;
 }
@@ -57,6 +53,33 @@ async function pickTarget(): Promise<string> {
 }
 
 /**
+ * Where `atlas jump <query>` lands: an exactly-named folder when no project carries the name
+ * itself, else the best-ranked project — and never a path that lives on another machine.
+ */
+async function resolveTarget(query: string[]): Promise<string> {
+	const q = normalize(query);
+	await requireUp();
+	const atlas = await apiGet<Atlas>('/api/projects');
+	const found = rankProjects(atlas.projects, q);
+	const best = found[0];
+
+	// A project named exactly (or nearly) the query wins; otherwise the folder of that name is
+	// the workspace you meant, and folders are only ever collected on this machine.
+	if (!best || rank(best, q) > 1) {
+		const folder = findFolder(atlas.folders ?? [], atlas.projects, q);
+		if (folder) return `${atlas.baseDir}/${folder}`;
+	}
+	if (!best) die(`No projects matching "${q}". Run \`atlas help\` for commands.`);
+
+	// A remote project's path exists on Fractal/Ubuntu, not here: cd-ing to it would
+	// drop the shell somewhere that does not exist. Refuse rather than half-work.
+	if (best.isLocal === false || (best.host && best.isLocal === undefined)) {
+		die(`"${best.name}" lives on ${best.host ?? 'another host'} (${best.path}) — atlas jump only moves within this machine.`);
+	}
+	return best.path;
+}
+
+/**
  * `atlas jump [query] [--run <cmd…>]` — the whole `pj` flow: resolve a target (best
  * match, or the fuzzy picker without a query) and hand the parent shell the `cd` line,
  * with `--run`'s command chained after it. Also reached via `atlas <query> --run <cmd>`.
@@ -66,7 +89,12 @@ export const jump: Command = {
 	summary: 'cd to a project (fuzzy picker with no query); --run <cmd> runs it there',
 	async run(args) {
 		const { query, cmd } = splitRun(args);
-		const target = query.length ? (await findProjects(query))[0].path : await pickTarget();
+		let target: string;
+		if (query.length) {
+			target = await resolveTarget(query);
+		} else {
+			target = await pickTarget();
+		}
 		if (!target) return; // picker cancelled
 		// The picker's action selections are already shell command lines.
 		const line = target.startsWith('exec:') ? target.slice('exec:'.length) : cdLine(target);
@@ -86,6 +114,9 @@ export const search: Command = {
 		const { query } = splitRun(args);
 		const found = await findProjects(query);
 		const width = Math.max(...found.map((p) => p.name.length));
-		for (const p of found) console.log(`${p.name.padEnd(width)}  ${p.relativePath}`);
+		for (const p of found) {
+			const where = p.isLocal ? '' : `  [${p.host ?? 'remote'}]`;
+			console.log(`${p.name.padEnd(width)}  ${p.relativePath}${where}`);
+		}
 	}
 };

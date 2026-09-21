@@ -36,3 +36,13 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 	if (!r.ok) throw new Error(`POST ${path} → ${r.status} ${r.statusText}`);
 	return r.json() as Promise<T>;
 }
+
+export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
+	const r = await fetch(`${API_BASE}${path}`, {
+		method: 'DELETE',
+		headers: { 'content-type': 'application/json' },
+		body: body === undefined ? undefined : JSON.stringify(body)
+	});
+	if (!r.ok) throw new Error(`DELETE ${path} → ${r.status} ${r.statusText}`);
+	return r.json() as Promise<T>;
+}
