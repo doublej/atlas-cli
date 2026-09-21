@@ -19,6 +19,7 @@ const PURPOSE =
 const WORKFLOWS: [string, string[]][] = [
 	['Find a project', ['atlas search <q>', 'atlas info <path> --json']],
 	['Start a project', ['atlas templates', 'atlas new <family/name> --name <n> --category <cat> [--var k=v]']],
+	['Free disk space', ['atlas disk analyze --json  # then: atlas disk archive <category/project> --dry-run', 'atlas disk scan --json  # clean: atlas disk clean <path> --unattended (policy-gated)', 'atlas disk doctor']],
 	['Run it', ['atlas run [path]  # prints the dev hostname; atlas follows the port the server binds']],
 	['Load its context', ['atlas tree compose [path]  # the CLAUDE.md chain as one doc', 'atlas tree search <q>']],
 	['Branch flow', ['atlas flow', 'atlas flow init --dry-run  # then without --dry-run']],
