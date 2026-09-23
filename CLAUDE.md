@@ -47,7 +47,7 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 
 | Command | Status | Notes |
 |---------|--------|-------|
-| `prime [--json]` | ✅ | agent crash course, first in `atlas help`: purpose, command list (generated from `COMMANDS`), workflows, guardrails, output contract, detected cwd/project/API state. Markdown by default; `--json` emits the same model. Edit its `WORKFLOWS`/`GUARDRAILS` when a command's contract changes |
+| `prime [--json]` | ✅ | agent crash course, first in `atlas help`: purpose, workflows (commands are left to `atlas help`), guardrails, output contract, detected cwd/project/API state. Markdown by default; `--json` emits the same model. Edit its `WORKFLOWS`/`GUARDRAILS` when a command's contract changes |
 | `brief [--json\|--install-hook]` | ✅ | session briefing (last session, handoff, journal, beads, CLAUDE.md size) from local sources only; the global SessionStart hook. Silent outside a recognized project |
 | `tree` | ✅ | no subcommand → prints tree help |
 | `tree view [path] [--up]` | ✅ | ascii CLAUDE.md tree in the terminal (from `?root=` graph). `--up` requests `&up=1` — only the chain towards the root, skipping the walk into children |

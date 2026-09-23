@@ -66,6 +66,6 @@ export function renderBrief(data: BriefData, nowMs: number): string {
 		const stale = data.claudeMd.staleSinceSessions ? ' — stale vs recent sessions' : '';
 		lines.push(`  claude.md: ~${fmtTokens(data.claudeMd.tokens)} tokens · ${edited}${stale}`);
 	}
-	lines.push('  primer:    `atlas prime` — commands, workflows, guardrails');
+	lines.push('  primer:    `atlas prime` — workflows, guardrails');
 	return lines.join('\n');
 }
