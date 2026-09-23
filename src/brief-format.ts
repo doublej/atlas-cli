@@ -68,7 +68,7 @@ export function renderBrief(data: BriefData, nowMs: number): string {
 		lines.push(`  claude.md: ~${fmtTokens(data.claudeMd.tokens)} tokens · ${edited}${stale}`);
 	}
 	{
-		const ask = 'post before you finish: `atlas board post "…"`';
+		const ask = 'post before you finish: `atlas board post --re "<subject>" "…"`';
 		lines.push(`  board:     ${data.board.posts ? `${data.board.posts} posts (\`atlas board\`)` : 'empty, be the first'} · ${ask}`);
 		for (const post of data.board.latest) {
 			const text = post.text.replace(/\s+/g, ' ');

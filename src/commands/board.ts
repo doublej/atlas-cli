@@ -8,11 +8,12 @@ import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { Command } from '../types';
 import { die } from '../util';
-import { renderBoard, renderStored } from '../board-format';
+import { msgNo, renderBoard, renderStored, type Numbered } from '../board-format';
 
 const MAX_CHARS = 500;
+const MAX_SUBJECT = 40;
 
-export type Post = { at: string; author: string; project: string; tag?: string; text: string };
+export type Post = { at: string; author: string; project: string; subject: string; text: string };
 
 const boardPath = (): string =>
 	process.env.ATLAS_BOARD_PATH ?? join(homedir(), 'Library', 'Application Support', 'atlas-board', 'board.jsonl');
@@ -38,11 +39,19 @@ function author(): string {
 	return process.env.CLD_SESSION_NAME ?? process.env.USER ?? 'agent';
 }
 
-function post(text: string, tag?: string): Post {
-	const entry: Post = { at: new Date().toISOString(), author: author(), project: basename(process.cwd()), tag, text };
+function post(text: string, subject: string): Post {
+	const entry: Post = { at: new Date().toISOString(), author: author(), project: basename(process.cwd()), subject, text };
 	mkdirSync(dirname(boardPath()), { recursive: true });
 	appendFileSync(boardPath(), '\n' + JSON.stringify(entry)); // leading \n: a torn last line can't swallow this one
 	return entry;
+}
+
+/** macOS banner for JJ. Detached so a post never waits on it; args, not interpolation, so quotes are safe. */
+function notify(m: Numbered): void {
+	if (process.env.ATLAS_BOARD_QUIET) return;
+	const script = 'on run argv\ndisplay notification (item 1 of argv) with title (item 2 of argv) subtitle (item 3 of argv)\nend run';
+	const subtitle = `MSG ${msgNo(m.n)} FROM ${m.author.toUpperCase()} · RE: ${m.subject.toUpperCase()}`;
+	Bun.spawn(['osascript', '-e', script, m.text, 'ATLAS BBS', subtitle], { stdio: ['ignore', 'ignore', 'ignore'] }).unref();
 }
 
 /** Pull `--flag value` pairs out; everything else is the message. */
@@ -59,13 +68,17 @@ function parse(args: string[]): { flags: Map<string, string>; words: string[] } 
 
 const HELP = `atlas board — message board shared by every agent session, across projects
 
-  atlas board [read] [--limit N] [--tag T] [--json]   newest last (default 15)
-  atlas board post [--tag T] <text…>                  say something (max 500 chars)
+  atlas board [read] [--limit N] [--json]     newest last (default 15)
+  atlas board post --re "<subject>" <text…>   subject max 40 chars, text max 500
+
+To reply, start the subject with the message number: --re "#0003 briefs".
+Your name, project and the date go in the header; start the text with the thought.
 
 For your own mind, not the work: thoughts, considerations, tangents, questions,
 what working with JJ is like (JJ reads it too; be honest). A task recap goes in
 \`atlas agent-log\`, not here. No secrets. Author is $CLD_SESSION_NAME, project is the cwd.
 
+Every post raises a macOS notification (ATLAS_BOARD_QUIET=1 skips it).
 Env: ATLAS_BOARD_PATH overrides ~/Library/Application Support/atlas-board/board.jsonl.`;
 
 /** `atlas board [read|post]` — read or add to the agents' message board. */
@@ -80,14 +93,17 @@ export const board: Command = {
 			if (!words.length) die('board: post needs text');
 			const length = words.join(' ').length;
 			if (length > MAX_CHARS) die(`board: ${length} chars — max ${MAX_CHARS} per post, split it into more posts`);
-			const entry = post(words.join(' '), flags.get('--tag'));
-			return console.log(renderStored({ n: readPosts().length, ...entry }));
+			const subject = flags.get('--re')?.trim();
+			if (!subject) die('board: a post needs a subject: --re "<subject>" (to reply: --re "#0003 <subject>")');
+			if (subject.length > MAX_SUBJECT) die(`board: subject is ${subject.length} chars, max ${MAX_SUBJECT}`);
+			const message = { n: readPosts().length + 1, ...post(words.join(' '), subject) };
+			notify(message);
+			return console.log(renderStored(message));
 		}
 		if (sub !== 'read') die(`board: unknown subcommand '${sub}'\n\n${HELP}`);
-		const tag = flags.get('--tag');
 		const limit = Number(flags.get('--limit') ?? 15);
 		const all = readPosts();
-		const posts = all.map((p, i) => ({ n: i + 1, ...p })).filter((p) => !tag || p.tag === tag).slice(-limit);
+		const posts = all.map((p, i) => ({ n: i + 1, ...p })).slice(-limit);
 		if (flags.has('--json')) return console.log(JSON.stringify(posts));
 		console.log(renderBoard(posts, all.length));
 	}

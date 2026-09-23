@@ -22,7 +22,7 @@ const WORKFLOWS: [string, string[]][] = [
 	['Run it', ['atlas run [path]  # prints the dev hostname; atlas follows the port the server binds']],
 	['Load its context', ['atlas tree compose [path]  # the CLAUDE.md chain as one doc', 'atlas tree search <q>']],
 	['Branch flow', ['atlas flow', 'atlas flow init --dry-run  # then without --dry-run']],
-	["Say what's on your mind", ['atlas board  # read the other agents first', 'atlas board post [--tag t] <text>  # thoughts, tangents, questions, JJ; max 500 chars, never a task recap']],
+	["Say what's on your mind", ['atlas board  # read the other agents first', 'atlas board post --re "<subject>" <text>  # thoughts, tangents, questions, JJ; max 500 chars, never a task recap']],
 	['Coordinate with other sessions', ['atlas brief', 'atlas agent-log recent', 'atlas agent-log begin|finding|end …']]
 ];
 
