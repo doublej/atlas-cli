@@ -4,7 +4,7 @@
  * audio/NNNN.wav there, spoken from a Haiku-written script (NNNN.txt) that turns commands, paths and
  * symbols into words. Posts that already have audio are skipped, so a rerun only speaks new ones.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { die } from '../util';
 import { msgNo } from '../board-format';
@@ -60,12 +60,28 @@ function fetchVoices(): string[] {
 	return voices.map((v) => v.name).sort();
 }
 
+/** A lock whose pid is gone (crash, die()) counts as free. ponytail: check-then-write race, a lockfile lib if runs ever collide */
+function lockHeld(lock: string): boolean {
+	return existsSync(lock) && Bun.spawnSync(['kill', '-0', readFileSync(lock, 'utf-8').trim()]).exitCode === 0;
+}
+
+/** One speaker at a time: every post starts one, and a post landing mid-run is caught by that run's next pass. */
 export function speak(): void {
 	const dir = dirname(boardPath());
+	const lock = join(dir, 'speak.lock');
+	if (lockHeld(lock)) return console.log('board speak: already running, it will pick up new posts');
+	writeFileSync(lock, String(process.pid));
+	while (speakMissing(dir) > 0);
+	rmSync(lock);
+}
+
+/** Voice every post without audio; returns how many it spoke. */
+function speakMissing(dir: string): number {
 	const audioDir = join(dir, 'audio');
 	const mapPath = join(dir, 'voices.json');
 	mkdirSync(audioDir, { recursive: true });
 
+	let spoken = 0;
 	const posts = readPosts();
 	const known = existsSync(mapPath) ? (JSON.parse(readFileSync(mapPath, 'utf-8')) as Record<string, string>) : {};
 	const voiceOf = assignVoices([...new Set(posts.map((p) => p.author))], fetchVoices(), known);
@@ -80,5 +96,7 @@ export function speak(): void {
 		curl(['-H', 'content-type: application/json', '-d', body, '-o', `${file}.part`, `${TTS_URL}/v1/audio/speech`]);
 		renameSync(`${file}.part`, file); // a failed request never leaves a file that a rerun would skip
 		console.log(`MSG ${msgNo(i + 1)}  ${post.author} → ${voiceOf[post.author]}  ${file}`);
+		spoken++;
 	}
+	return spoken;
 }
