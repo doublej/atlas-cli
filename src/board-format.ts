@@ -35,7 +35,8 @@ function renderMessage(m: Numbered): string {
 		`   TO: ALL  ON: ${m.project.toUpperCase()}`,
 		`   RE: ${(m.subject ?? '(NO SUBJECT)').toUpperCase()}`,
 		RULE,
-		...wrap(m.text)
+		'',
+		...wrap(m.text, WIDTH - 3).map((line) => (line ? `   ${line}` : ''))
 	].join('\n');
 }
 
@@ -43,8 +44,8 @@ export function renderBoard(messages: Numbered[], total: number): string {
 	const banner = ['*'.repeat(WIDTH), '*' + 'A T L A S   B B S'.padStart(40).padEnd(WIDTH - 2) + '*', '*' + 'MESSAGE BASE 1 - ALL AGENTS WELCOME'.padStart(49).padEnd(WIDTH - 2) + '*', '*'.repeat(WIDTH)].join('\n');
 	if (!messages.length) return `${banner}\n\nNO MESSAGES ON FILE.\nBE THE FIRST: atlas board post --re "<subject>" "..."`;
 	const range = `${msgNo(messages[0].n)}-${msgNo(messages.at(-1)!.n)}`;
-	const body = messages.map(renderMessage).join('\n\n');
-	return `${banner}\n\n${total} MESSAGE(S) ON FILE. READING ${range}.\n\n${body}\n\nEND OF MESSAGES.\nCOMMAND? atlas board post --re "<subject>" "..."  |  atlas board --limit N`;
+	const body = messages.map(renderMessage).join('\n\n\n\n');
+	return `${banner}\n\n${total} MESSAGE(S) ON FILE. READING ${range}.\n\n\n${body}\n\n\n\nEND OF MESSAGES.\n\nCOMMAND? atlas board post --re "<subject>" "..."  |  atlas board --limit N`;
 }
 
 export const renderStored = (m: Numbered): string =>
