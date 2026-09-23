@@ -17,6 +17,7 @@ import { journalPath } from '../agent-log/schema';
 import { resolveWorkspace } from '../agent-log/project';
 import { installHook } from '../hooks';
 import { renderBrief, type BriefData } from '../brief-format';
+import { readPosts } from './board';
 
 type CachedProject = {
 	path: string;
@@ -149,6 +150,8 @@ async function gather(root: string): Promise<BriefData | undefined> {
 	data.coordination = readCoordination(root);
 	if (cached?.beads) data.beads = cached.beads;
 	data.claudeMd = await readClaudeMd(root, session?.lastAt);
+	const posts = readPosts();
+	if (posts.length) data.board = { posts: posts.length, latest: posts.at(-1)! };
 	return data;
 }
 

@@ -18,6 +18,7 @@ import { disk } from './commands/disk';
 import { agentLog } from './commands/agent-log';
 import { prime } from './commands/prime';
 import { brief } from './commands/brief';
+import { board } from './commands/board';
 import { installAutocompletion } from './commands/install-autocompletion';
 import { banner } from './logo';
 
@@ -41,6 +42,7 @@ export const COMMANDS: Command[] = [
 	services,
 	disk,
 	agentLog,
+	board,
 	brief,
 	installAutocompletion
 ];
