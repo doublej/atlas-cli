@@ -2,12 +2,11 @@
  * `atlas prime` — the agent crash course: what atlas is, the command surface, the
  * workflows, the guardrails, and what it detects about where you are. Markdown by
  * default (the reader is an agent's reasoning, not a parser), `--json` for the model.
- * The command list is generated from COMMANDS so it can't drift from `atlas help`.
+ * The command list lives in `atlas help`; prime only points at it.
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from '../types';
-import { COMMANDS } from '../registry';
 import { API_BASE, isUp } from '../api';
 import { DEV_FOLDER } from '../template-discovery';
 import { projectFor, type InfoProject } from './info';
@@ -63,22 +62,20 @@ async function detect(): Promise<Detected> {
 
 function render(d: Detected): string {
 	const list = (xs: string[]) => xs.map((x) => `- ${x}`).join('\n');
-	const commands = COMMANDS.map((c) => `- \`${c.name}\` — ${c.summary}`).join('\n');
 	const workflows = WORKFLOWS.map(([goal, steps]) => `**${goal}**\n\`\`\`sh\n${steps.join('\n')}\n\`\`\``).join('\n\n');
 	const detected = Object.entries(d).filter(([, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-	return `# atlas ${pkg.version}\n\n${PURPOSE}\n\n## Commands\n${commands}\n\n\`atlas <command> --help\` for flags.\n\n## Workflows\n${workflows}\n\n## Guardrails\n${list(GUARDRAILS)}\n\n## Output contract\n${list(OUTPUT)}\n\n## Detected\n${detected}\n`;
+	return `# atlas ${pkg.version}\n\n${PURPOSE}\n\n## Commands\n\`atlas help\` lists them; \`atlas <command> --help\` for flags.\n\n## Workflows\n${workflows}\n\n## Guardrails\n${list(GUARDRAILS)}\n\n## Output contract\n${list(OUTPUT)}\n\n## Detected\n${detected}\n`;
 }
 
 /** `atlas prime [--json]` — the crash course on using atlas. */
 export const prime: Command = {
 	name: 'prime',
-	summary: 'crash course for agents: commands, workflows, guardrails, detected state',
+	summary: 'crash course for agents: workflows, guardrails, detected state',
 	usage: 'atlas prime [--json]  — Markdown primer; --json emits the same model',
 	async run(args) {
 		const detected = await detect();
 		if (!args.includes('--json')) return console.log(render(detected));
-		const commands = COMMANDS.map(({ name, summary }) => ({ name, summary }));
 		const workflows = WORKFLOWS.map(([goal, steps]) => ({ goal, steps }));
-		console.log(JSON.stringify({ name: 'atlas', version: pkg.version, purpose: PURPOSE, commands, workflows, guardrails: GUARDRAILS, output: OUTPUT, detected }, null, 2));
+		console.log(JSON.stringify({ name: 'atlas', version: pkg.version, purpose: PURPOSE, workflows, guardrails: GUARDRAILS, output: OUTPUT, detected }, null, 2));
 	}
 };
