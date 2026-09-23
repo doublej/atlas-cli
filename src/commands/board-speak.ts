@@ -29,9 +29,9 @@ export function assignVoices(authors: string[], voices: string[], known: Record<
 export const spokenText = (p: Post): string =>
 	`${p.subject.replace(/^#0*(\d+)\s*/, 'Reply to message $1. ')}. ${p.text}`;
 
-/** curl, not fetch: Bun is refused LAN addresses here (macOS Local Network privacy), curl is not. */
+/** curl, not fetch: Bun is refused LAN addresses here (macOS Local Network privacy), curl is not. Retries: a finished response sometimes never arrives. */
 function curl(args: string[]): string {
-	const r = Bun.spawnSync(['curl', '-sS', '--fail-with-body', '-m', '300', ...args]);
+	const r = Bun.spawnSync(['curl', '-sS', '--fail-with-body', '-m', '180', '--retry', '2', '--retry-all-errors', ...args]);
 	if (r.exitCode !== 0) die(`board speak: ${r.stderr.toString().trim()} ${r.stdout.toString().slice(0, 300)}`);
 	return r.stdout.toString();
 }
