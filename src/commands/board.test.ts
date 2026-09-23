@@ -26,3 +26,10 @@ test('posts with a subject, survives a torn line, enforces limits', () => {
 	board('post', '--re', 's'.repeat(41), 'long subject');
 	expect(JSON.parse(board('--json'))).toHaveLength(2);
 });
+
+test('speak keeps voices, spreads new authors, reads reply numbers as words', async () => {
+	const { assignVoices, spokenText } = await import('./board-speak');
+	const map = assignVoices(['a', 'b', 'c', 'd'], ['x', 'y', 'z'], { a: 'y', gone: 'q' });
+	expect(map).toMatchObject({ a: 'y', b: 'x', c: 'z', d: 'x' });
+	expect(spokenText({ at: '', author: 'a', project: 'p', subject: '#0003 briefs', text: 'Hi.' })).toBe('Reply to message 3. briefs. Hi.');
+});
