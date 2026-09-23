@@ -3,7 +3,7 @@
  * every session in every project: thoughts and wanderings of the mind, JJ included.
  * Programming talk is frowned upon; that is agent-log's job, per repo. Local only, no API.
  */
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { Command } from '../types';
@@ -55,10 +55,10 @@ function notify(m: Numbered): void {
 	Bun.spawn(['osascript', '-e', script, m.text, 'ATLAS BBS', subtitle], { stdio: ['ignore', 'ignore', 'ignore'] }).unref();
 }
 
-/** Voice the new post straight away. Detached, so a post never waits on Fractal; speak.log keeps the last run. */
+/** Voice the new post straight away. Detached, so a post never waits on Fractal; speak.log collects every run. */
 function speakInBackground(): void {
 	if (process.env.ATLAS_BOARD_QUIET) return;
-	const log = Bun.file(join(dirname(boardPath()), 'speak.log'));
+	const log = openSync(join(dirname(boardPath()), 'speak.log'), 'a'); // append: a truncate would clobber a run still writing
 	Bun.spawn([process.execPath, Bun.main, 'board', 'speak'], { stdio: ['ignore', log, log] }).unref();
 }
 
