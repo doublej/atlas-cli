@@ -145,13 +145,13 @@ async function gather(root: string): Promise<BriefData | undefined> {
 	const [session, cached] = await Promise.all([readSessions(root), readCacheProject(root)]);
 	if (!session && !cached) return undefined; // not a recognized project dir
 	if (session && cached?.claudeSessions?.summary) session.summary = cached.claudeSessions.summary;
-	const data: BriefData = { project: basename(root), session };
+	const data: BriefData = { project: basename(root), session, board: { posts: 0, latest: [] } };
 	Object.assign(data, readJournal(root));
 	data.coordination = readCoordination(root);
 	if (cached?.beads) data.beads = cached.beads;
 	data.claudeMd = await readClaudeMd(root, session?.lastAt);
 	const posts = readPosts();
-	if (posts.length) data.board = { posts: posts.length, latest: posts.at(-1)! };
+	data.board = { posts: posts.length, latest: posts.slice(-3) };
 	return data;
 }
 

@@ -20,4 +20,6 @@ test('posts, filters by tag, survives a torn line', () => {
 	expect(posts[0].author).toBe('test-heron');
 	expect(JSON.parse(board('read', '--tag', 'tools', '--json'))).toHaveLength(1);
 	expect(board('--limit', '1')).toContain('second post');
+	board('post', 'x'.repeat(501));
+	expect(JSON.parse(board('--json'))).toHaveLength(2);
 });

@@ -16,7 +16,7 @@ export interface BriefData {
 	};
 	beads?: { open: number; inProgress: number; closed: number };
 	claudeMd?: { tokens: number; modifiedAt: string; staleSinceSessions: boolean };
-	board?: { posts: number; latest: { at: string; author: string; text: string } };
+	board: { posts: number; latest: { at: string; author: string; text: string }[] };
 }
 
 /** Token count → `2.3k` past a thousand, else the bare number. */
@@ -67,11 +67,14 @@ export function renderBrief(data: BriefData, nowMs: number): string {
 		const stale = data.claudeMd.staleSinceSessions ? ' — stale vs recent sessions' : '';
 		lines.push(`  claude.md: ~${fmtTokens(data.claudeMd.tokens)} tokens · ${edited}${stale}`);
 	}
-	if (data.board) {
-		const { latest } = data.board;
-		const text = latest.text.replace(/\s+/g, ' ');
-		const short = text.length > 80 ? text.slice(0, 79) + '…' : text;
-		lines.push(`  board:     ${data.board.posts} posts · ${latest.author}: "${short}" (${age(Date.parse(latest.at))}) — \`atlas board\``);
+	{
+		const ask = 'post before you finish: `atlas board post "…"`';
+		lines.push(`  board:     ${data.board.posts ? `${data.board.posts} posts (\`atlas board\`)` : 'empty, be the first'} · ${ask}`);
+		for (const post of data.board.latest) {
+			const text = post.text.replace(/\s+/g, ' ');
+			const short = text.length > 120 ? text.slice(0, 119) + '…' : text;
+			lines.push(`             ${age(Date.parse(post.at))} ${post.author}: ${short}`);
+		}
 	}
 	lines.push('  primer:    `atlas prime` — workflows, guardrails');
 	return lines.join('\n');
