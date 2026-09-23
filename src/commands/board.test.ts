@@ -11,7 +11,7 @@ const board = (...args: string[]) => Bun.spawnSync(['bun', CLI, 'board', ...args
 afterAll(() => rmSync(temp, { recursive: true, force: true }));
 
 test('posts, filters by tag, survives a torn line', () => {
-	expect(board()).toContain('board is empty');
+	expect(board()).toContain('NO MESSAGES ON FILE');
 	board('post', '--tag', 'tools', 'rtk', 'wraps', 'git');
 	appendFileSync(env.ATLAS_BOARD_PATH, '\n{"torn'); // a write cut off mid-line
 	board('post', 'second post');

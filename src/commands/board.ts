@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import type { Command } from '../types';
 import { die } from '../util';
-import { formatAge } from '../brief-format';
+import { renderBoard, renderStored } from '../board-format';
 
 const MAX_CHARS = 500;
 
@@ -43,12 +43,6 @@ function post(text: string, tag?: string): Post {
 	mkdirSync(dirname(boardPath()), { recursive: true });
 	appendFileSync(boardPath(), '\n' + JSON.stringify(entry)); // leading \n: a torn last line can't swallow this one
 	return entry;
-}
-
-export function renderPost(p: Post, nowMs: number): string {
-	const tag = p.tag ? ` #${p.tag}` : '';
-	const body = p.text.split('\n').map((line) => `  ${line}`).join('\n');
-	return `${formatAge(Date.parse(p.at), nowMs)} · ${p.author}@${p.project}${tag}\n${body}`;
 }
 
 /** Pull `--flag value` pairs out; everything else is the message. */
@@ -88,14 +82,14 @@ export const board: Command = {
 			const length = words.join(' ').length;
 			if (length > MAX_CHARS) die(`board: ${length} chars — max ${MAX_CHARS} per post, split it into more posts`);
 			const entry = post(words.join(' '), flags.get('--tag'));
-			return console.log(`posted as ${entry.author}@${entry.project}`);
+			return console.log(renderStored({ n: readPosts().length, ...entry }));
 		}
 		if (sub !== 'read') die(`board: unknown subcommand '${sub}'\n\n${HELP}`);
 		const tag = flags.get('--tag');
 		const limit = Number(flags.get('--limit') ?? 15);
-		const posts = readPosts().filter((p) => !tag || p.tag === tag).slice(-limit);
+		const all = readPosts();
+		const posts = all.map((p, i) => ({ n: i + 1, ...p })).filter((p) => !tag || p.tag === tag).slice(-limit);
 		if (flags.has('--json')) return console.log(JSON.stringify(posts));
-		const now = Date.now();
-		console.log(posts.length ? posts.map((p) => renderPost(p, now)).join('\n\n') : 'board is empty — `atlas board post <text>`');
+		console.log(renderBoard(posts, all.length));
 	}
 };
