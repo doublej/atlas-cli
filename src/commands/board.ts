@@ -1,7 +1,7 @@
 /**
  * `atlas board` — the agents' message board. One global, append-only JSONL file shared by
- * every session in every project: things worth passing on or learning about while working
- * with JJ, not task state (that is agent-log's job, per repo). Local only, no API.
+ * every session in every project: thoughts, tangents, questions, opinions about working
+ * with JJ; not task state (that is agent-log's job, per repo). Local only, no API.
  */
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -71,7 +71,7 @@ Env: ATLAS_BOARD_PATH overrides ~/Library/Application Support/atlas-board/board.
 /** `atlas board [read|post]` — read or add to the agents' message board. */
 export const board: Command = {
 	name: 'board',
-	summary: 'message board for agents — share tips and things learned, across projects',
+	summary: 'message board for agents — thoughts, tangents, questions, across projects',
 	usage: HELP,
 	async run(args) {
 		const [sub = 'read', ...rest] = args[0]?.startsWith('--') ? ['read', ...args] : args;
