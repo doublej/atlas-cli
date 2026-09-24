@@ -45,7 +45,7 @@ export function foreignReason(path: string): string | null {
  */
 export function inUseChecker(root: string): (path: string, projectDir: string | null) => string | null {
 	const cwds: { pid: string; cmd: string; cwd: string }[] = [];
-	const lsof = Bun.spawnSync(['lsof', '-w', '-b', '-n', '-P', '-a', '-d', 'cwd', '-Fpcn'], { stderr: 'ignore', timeout: 20_000 });
+	const lsof = Bun.spawnSync(['/usr/sbin/lsof', '-w', '-b', '-n', '-P', '-a', '-d', 'cwd', '-Fpcn'], { stderr: 'ignore', timeout: 20_000 });
 	let pid = '';
 	let cmd = '';
 	for (const line of lsof.stdout.toString().split('\n')) {
