@@ -9,7 +9,7 @@ import { approve, isCancelled, modeOf, policy, trapCancel } from './approval';
 import { acquire } from './lock';
 import { listVersions, resolveVersion } from './archive-list';
 import { restoreVersion } from './restore-one';
-import { renderItems, type ItemReport, type Report } from './report';
+import { progress, renderItems, type ItemReport, type Report } from './report';
 import type { ArchiveVersion } from './types';
 
 /** Resolve refs to versions; unknown refs, held projects and existing folders become report items. */
@@ -53,6 +53,12 @@ export async function run(args: string[]): Promise<Report> {
 	const ok = await approve(policy('restore', mode, s, f), `Restore ${plan.length} project(s)?`);
 	if (ok !== true) return { command: 'restore', items: [...items, ...plan.map((v) => ({ item: v.id, outcome: 'refused' as const, needs: ok.refuse }))] };
 	trapCancel();
-	for (const v of plan) items.push(isCancelled() ? { item: v.id, outcome: 'skipped', reason: 'cancelled before it started' } : await restoreVersion(v, s.devRoot, keep));
+	for (const [i, v] of plan.entries()) {
+		if (isCancelled()) items.push({ item: v.id, outcome: 'skipped', reason: 'cancelled before it started' });
+		else {
+			progress(i + 1, plan.length, `restoring ${v.id} (${human(v.bytes)})`);
+			items.push(await restoreVersion(v, s.devRoot, keep));
+		}
+	}
 	return { command: 'restore', items };
 }

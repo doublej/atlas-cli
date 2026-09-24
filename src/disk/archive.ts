@@ -18,7 +18,7 @@ import { ALWAYS_EXCLUDED, REBUILDABLE } from './archive-core';
 import { archiveProject, type ArchiveOpts } from './archive-one';
 import { listVersions } from './archive-list';
 import { pruneArchives } from './archive-prune';
-import { renderItems, type ItemReport, type Report } from './report';
+import { progress, renderItems, type ItemReport, type Report } from './report';
 import type { ProjectRow } from './types';
 
 export function parseCompression(raw: string | undefined, fallback: number): number {
@@ -47,7 +47,7 @@ const risky = (p: ProjectRow) => p.dirty || p.push === 'unpushed';
 function planText(plan: ProjectRow[], o: ArchiveOpts): string {
 	const total = plan.reduce((n, p) => n + p.bytes, 0);
 	const rows = plan.map((p) => `  ${human(p.bytes).padStart(9)}  ${p.id}${risky(p) ? `  [${[p.dirty && 'uncommitted', p.push === 'unpushed' && 'unpushed'].filter(Boolean).join(', ')}]` : ''}`);
-	return [`Archive plan → ${o.archiveDir} (compression ${o.compression || 'none'}):`, ...rows, `  frees up to ${human(total)} on this Mac (archives stay local until uploaded and evicted)`].join('\n');
+	return [`Archive plan → ${o.archiveDir} (compression ${o.compression || 'none'}):`, ...rows, `  frees up to ${human(total)} on this Mac, once the archives are uploaded to the cloud`].join('\n');
 }
 
 /** A UI confirms each dirty project on its own: only the ids passed as `--confirm-dirty` go. */
@@ -97,7 +97,8 @@ export async function run(args: string[]): Promise<Report> {
 	const { go, refused } = await approvePlan(plan, mode, s, f);
 	trapCancel();
 	const items: ItemReport[] = [...bad, ...held, ...refused];
-	for (const p of go) {
+	for (const [i, p] of go.entries()) {
+		if (!isCancelled()) progress(i + 1, go.length, `archiving ${p.id} (${human(p.bytes)})`);
 		if (isCancelled()) items.push({ item: p.id, outcome: 'skipped', reason: 'cancelled before it started' });
 		else items.push(await archiveProject(p.id, p.bytes, o));
 	}

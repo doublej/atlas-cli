@@ -38,6 +38,9 @@ export function exitFor(r: Report): ExitName {
 	return items.some((i) => i.outcome === 'done') ? 'ok' : 'nothing';
 }
 
+/** One line per item as a batch works through it — the report itself only prints at the end. */
+export const progress = (n: number, total: number, what: string): void => console.error(`[${n}/${total}] ${what}…`);
+
 const MARK: Record<Outcome, string> = { done: '✓', skipped: '–', refused: '⊘', failed: '✗' };
 
 export function renderItems(items: ItemReport[]): string {

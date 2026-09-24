@@ -12,7 +12,7 @@ import { parseFlags, type Flags } from './flags';
 import { freeBytes, human, writeJsonAtomic } from './fsutil';
 import { acquire } from './lock';
 import { end, isHeld, start } from './oplog';
-import { renderItems, type ItemReport, type Report } from './report';
+import { progress, renderItems, type ItemReport, type Report } from './report';
 import { finalize, loadScan, type SavedScan } from './scan';
 import { RISK_ORDER } from './scan-rules';
 import { loadSettings, statePath, type Settings } from './settings';
@@ -121,7 +121,13 @@ export async function run(args: string[]): Promise<Report> {
 	const holder = go.length ? acquire('clean') : null;
 	if (holder) return { command: 'clean', items: [...items, ...go.map((r) => refuse(r, `another job is running: ${holder.job} (pid ${holder.pid})`))] };
 	trapCancel();
-	for (const r of go) items.push(isCancelled() ? skip(r, 'cancelled') : await removeOne(r, toTrash(r)));
+	for (const [i, r] of go.entries()) {
+		if (isCancelled()) items.push(skip(r, 'cancelled'));
+		else {
+			progress(i + 1, go.length, `removing ${r.path} (${human(r.bytes)})`);
+			items.push(await removeOne(r, toTrash(r)));
+		}
+	}
 	forget(scan, items);
 	return { command: 'clean', items, data: { scanRanAt: scan.ranAt }, text: items.length ? `${renderItems(items)}\n\n${summary(items)}` : undefined };
 }
