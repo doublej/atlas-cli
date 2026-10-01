@@ -156,6 +156,13 @@ describe('atlas kill', () => {
 		expect(partial.stdout).toContain('rerun with --force');
 	});
 
+	test('--json prints one document when nothing stops: no match, or every target refused', async () => {
+		const none = await fresh().cli(['kill', '999', '--yes', '--json']);
+		expect([none.code, (JSON.parse(none.stdout) as StopResponse).results]).toEqual([2, []]);
+		const refused = await fresh(stopper([101])).cli(['kill', '101', '--yes', '--json']);
+		expect([refused.code, (JSON.parse(refused.stdout) as StopResponse).results[0].label]).toEqual([4, 'com.x.job']);
+	});
+
 	test("the server's 400 error text is the message, exit 1", async () => {
 		const s = fakeApi({
 			'GET /api/processes': SNAP,
@@ -206,5 +213,12 @@ describe('atlas kill <project> leaves agents, shells and its own process tree al
 		const r = await s.cli(['kill', String(process.pid), '--yes']);
 		expect([r.code, targets(s)]).toEqual([4, undefined]);
 		expect(r.stderr).toContain('the shell/session running it');
+	});
+
+	test('an ancestor missing from the snapshot (a build that predates the shell) is still its own', async () => {
+		// The CLI's parent (this test runner) is not in the snapshot; its grandparent is.
+		const s = fresh(undefined, { generatedAt: T, rows: [], processes: [proc(process.ppid, 'just')] });
+		const r = await s.cli(['kill', String(process.ppid), '--yes']);
+		expect([r.code, targets(s)]).toEqual([4, undefined]);
 	});
 });

@@ -64,9 +64,8 @@ export function projectTargets(
 	return { targets: unique(targets), candidates };
 }
 
-/** `self` and every ancestor the snapshot knows (the shell and agent session running the CLI). */
-export function ancestry(snap: ProcessSnapshot, self: number, parent: number): Set<number> {
-	const ppid = new Map(snap.processes.map((p) => [p.pid, p.ppid]));
+/** `self` and every ancestor in `ppid` (pid → ppid): the shell and agent session running the CLI. */
+export function ancestry(ppid: Map<number, number>, self: number, parent: number): Set<number> {
 	const seen = new Set([self]);
 	for (let pid = parent; pid > 1 && !seen.has(pid); pid = ppid.get(pid) ?? 0) seen.add(pid);
 	return seen;

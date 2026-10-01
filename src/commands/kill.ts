@@ -82,7 +82,9 @@ async function find(target: string, snap: ProcessSnapshot, all: boolean): Promis
 async function resolve(target: string, all = false): Promise<{ targets: NamedTarget[]; own: NamedTarget[] }> {
 	const snap = await apiGet<ProcessSnapshot>('/api/processes?all=1&fresh=1');
 	const found = await find(target, snap, all);
-	const self = ancestry(snap, process.pid, process.ppid);
+	// This Mac's own `ps`, taken now: a fresh snapshot can join a build that started before the calling shell.
+	const ps = Bun.spawnSync(['ps', '-axo', 'pid=,ppid=']).stdout.toString().trim().split('\n');
+	const self = ancestry(new Map(ps.map((l) => l.trim().split(/\s+/).map(Number) as [number, number])), process.pid, process.ppid);
 	return { targets: found.filter((t) => !self.has(t.pid)), own: found.filter((t) => self.has(t.pid)) };
 }
 
@@ -110,6 +112,7 @@ export const kill: Command = {
 		if (own.length) console.error(`skipping ${own.map((t) => `${t.pid} ${t.name}`).join(', ')}: this command or the shell/session running it`);
 		if (!named.length) {
 			if (!own.length) console.error(`Nothing matches ${positionals[0]}. See: atlas ps --all`);
+			if (values.json) console.log(JSON.stringify({ dryRun: true, generatedAt: new Date().toISOString(), results: [], wouldEnd: [], skipped: [] } satisfies StopResponse));
 			return void (process.exitCode = own.length ? EXIT.refused : EXIT.nothing);
 		}
 		const names = new Map(named.map((t) => [t.pid, t.name]));
@@ -121,7 +124,10 @@ export const kill: Command = {
 			return void (process.exitCode = EXIT[exitFor({ command: 'kill', items: planned })]);
 		}
 		console.error(renderPreview(preview, planned));
-		if (!preview.wouldEnd.length) return void (process.exitCode = EXIT[exitFor({ command: 'kill', items: planned })]);
+		if (!preview.wouldEnd.length) {
+			if (values.json) console.log(JSON.stringify(preview));
+			return void (process.exitCode = EXIT[exitFor({ command: 'kill', items: planned })]);
+		}
 		if (!values.yes && !process.stdin.isTTY) {
 			console.error(`refused: no terminal to confirm — rerun with --yes to stop ${preview.wouldEnd.length} process(es)`);
 			return void (process.exitCode = EXIT.refused);

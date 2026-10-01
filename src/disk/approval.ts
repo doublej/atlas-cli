@@ -70,7 +70,8 @@ export async function confirm(message: string): Promise<boolean> {
 	if (!process.stdin.isTTY) return false;
 	// Lazy: importing @inquirer/prompts at load time cuts piped stdout off at 64 KB.
 	const { confirm: ask } = await import('@inquirer/prompts');
-	return ask({ message, default: false });
+	// stderr: a piped or redirected stdout would swallow the question and break `--json`.
+	return ask({ message, default: false }, { output: process.stderr });
 }
 
 /** Resolve a verdict to go/no-go. `plan` is shown before an interactive question. */
