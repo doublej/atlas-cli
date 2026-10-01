@@ -35,12 +35,12 @@ describe('request errors', () => {
 		await expect(apiGet('/api/atlas?path=/tmp')).rejects.toThrow("path is not in this machine's catalog");
 	});
 
-	it('falls back to message, then the text, then the status line', async () => {
+	it('falls back to message, then the status line — never an HTML body', async () => {
 		const { apiPatch, apiPost, apiDelete } = await import('./api');
 		answer(JSON.stringify({ message: 'slug is taken' }), 409, 'Conflict');
 		await expect(apiPatch('/api/atlas', {})).rejects.toThrow('slug is taken');
-		answer('upstream down', 502, 'Bad Gateway');
-		await expect(apiPost('/api/run', {})).rejects.toThrow('upstream down');
+		answer('<!doctype html><h1>404</h1>', 404, 'Not Found');
+		await expect(apiPost('/api/run', {})).rejects.toThrow(/^POST \/api\/run → 404 Not Found$/);
 		answer('', 500, 'Internal Server Error');
 		await expect(apiDelete('/api/run', {})).rejects.toThrow('DELETE /api/run → 500 Internal Server Error');
 	});

@@ -23,18 +23,13 @@ export async function isUp(): Promise<boolean> {
 
 /**
  * What a failed call says: the body's `error` (every atlas-api route answers `{ error }`), else its
- * `message`, else the body text itself, else `fallback`. The status line alone hid the reason.
+ * `message`, else `fallback` — never a non-JSON body, which for a missing route is a whole HTML page.
  */
 async function errorText(r: Response, fallback: string): Promise<string> {
-	const text = (await r.text().catch(() => '')).trim();
-	try {
-		const body = JSON.parse(text) as { error?: unknown; message?: unknown };
-		if (typeof body?.error === 'string' && body.error) return body.error;
-		if (typeof body?.message === 'string' && body.message) return body.message;
-	} catch {
-		/* not JSON — the text is the message */
-	}
-	return text || fallback;
+	const body = (await r.json().catch(() => null)) as { error?: unknown; message?: unknown } | null;
+	if (typeof body?.error === 'string' && body.error) return body.error;
+	if (typeof body?.message === 'string' && body.message) return body.message;
+	return fallback;
 }
 
 /** The one place a call reaches the API. A non-2xx answer throws its own error text. */
