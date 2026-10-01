@@ -113,6 +113,17 @@ describe('recover', () => {
 	});
 });
 
+test('archive refuses an id that climbs out of devRoot', async () => {
+	const { saveSettings, DEFAULTS } = await import('./settings');
+	const { run } = await import('./archive');
+	saveSettings({ ...DEFAULTS, devRoot, archiveDir });
+	mkdirSync(join(root, 'outside'), { recursive: true }); // join(devRoot, '../outside') exists
+	const r = await run(['../outside', 'web/..', '--dry-run']);
+	const data = r.data as { plan: unknown[]; refused: { item: string; outcome: string }[] };
+	expect(data.plan).toEqual([]);
+	expect(data.refused.map((i) => [i.item, i.outcome])).toEqual([['../outside', 'refused'], ['web/..', 'refused']]);
+});
+
 test('prune never removes the only version of a project', () => {
 	const v = (project: string, version: string) => ({ project, version, id: `${project}@${version}` }) as never;
 	const doomed = pruneCandidates([v('a/x', '2'), v('a/x', '1'), v('b/y', '1')], 0);

@@ -38,9 +38,12 @@ async function targets(f: Flags, s: Settings): Promise<ProjectRow[]> {
 	return mapLimit(f.positional, 8, (id) => measureProject(id, join(s.devRoot, id), s));
 }
 
-/** Two levels, not in a skipped category. */
-const outOfScope = (id: string, s: Settings): string | null =>
-	id.split('/').length !== 2 ? 'not a <category>/<project> id' : s.skipCategories.includes(id.split('/')[0]) ? 'in a skipped category' : null;
+/** Two levels, not in a skipped category. No `.`/`..` segment: `../Documents` is outside devRoot. */
+const outOfScope = (id: string, s: Settings): string | null => {
+	const parts = id.split('/');
+	if (parts.length !== 2 || parts.some((p) => p === '' || p === '.' || p === '..')) return 'not a <category>/<project> id';
+	return s.skipCategories.includes(parts[0]) ? 'in a skipped category' : null;
+};
 
 const risky = (p: ProjectRow) => p.dirty || p.push === 'unpushed';
 
