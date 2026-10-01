@@ -61,12 +61,15 @@ Commands:
   view [path] [--up]     print the tree as ascii (--up: ancestors only, no children)
   search <query> [path]  search every CLAUDE.md in the tree (case-insensitive)
   compose [path]         concatenate the ancestor→project chain (the loaded context)
-  web [path]             open the tree in the atlas web viewer`;
+  web [path]             open the tree in the atlas web viewer
+
+--json on view, search and compose prints the nodes, hits or files as JSON.`;
 
 /** `atlas tree <view|search|compose|web>` — the CLAUDE.md tree, in the terminal or browser. */
 export const tree: Command = {
 	name: 'tree',
 	summary: 'CLAUDE.md tree — view/search/compose in terminal, or `web` for the viewer',
+	usage: HELP,
 	async run(args) {
 		const up = args.includes('--up');
 		const json = args.includes('--json');

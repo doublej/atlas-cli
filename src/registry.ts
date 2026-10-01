@@ -60,8 +60,12 @@ export const COMMANDS: Command[] = [
 export const findCommand = (name: string): Command | undefined =>
 	COMMANDS.find((c) => c.name === name);
 
+/** How to read further, and what is left out on purpose (agents have better tools for those). */
+export const HELP_FOOTER = `\`atlas <command> --help\` for flags. \`--json\` on every command that prints data; \`atlas prime\` for the agent contract.
+Not here on purpose: iTerm/Finder (GUI only, in the web console) and git, README, beads (use git, cat, bd directly).`;
+
 export function usage(): string {
 	const width = Math.max(...COMMANDS.map((c) => c.name.length));
 	const rows = COMMANDS.map((c) => `  ${c.name.padEnd(width)} ${c.summary}`).join('\n');
-	return `${banner()}\n\nUsage: atlas <command> [args]\n       atlas <query>           search projects (anything that isn't a command)\n\nCommands:\n${rows}\n`;
+	return `${banner()}\n\nUsage: atlas <command> [args]\n       atlas <query>           search projects (anything that isn't a command)\n\nCommands:\n${rows}\n\n${HELP_FOOTER}\n`;
 }

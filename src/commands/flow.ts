@@ -30,6 +30,8 @@ const USAGE = `Usage: atlas flow [status]        branch flow of the current proj
 Flags (init):
   --dry-run   print the git commands without running them
   --force     skip the safety checks (dirty tree, foreign remote, wrong branch)
+Flags (status, audit):
+  --json      the same data as one JSON document
 `;
 
 /** Run a git command in `cwd`; returns trimmed stdout, or null when it fails. */
@@ -198,6 +200,7 @@ async function init(root: string, dryRun: boolean, force: boolean): Promise<void
 export const flow: Command = {
 	name: 'flow',
 	summary: 'branch flow: status, migration audit, opt a repo in',
+	usage: USAGE,
 	async run(args) {
 		const [sub, pathArg] = args.filter((a) => !a.startsWith('--'));
 		const json = args.includes('--json');
