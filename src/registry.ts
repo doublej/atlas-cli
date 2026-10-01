@@ -6,6 +6,11 @@ import { newProject } from './commands/new';
 import { scan } from './commands/scan';
 import { open } from './commands/open';
 import { run } from './commands/run';
+import { stop } from './commands/stop';
+import { ps } from './commands/ps';
+import { kill } from './commands/kill';
+import { set } from './commands/set';
+import { daemons } from './commands/daemons';
 import { ps } from './commands/ps';
 import { kill } from './commands/kill';
 import { pick } from './commands/pick';
@@ -29,6 +34,7 @@ export const COMMANDS: Command[] = [
 	tree,
 	init,
 	info,
+	set,
 	newProject,
 	scan,
 	open,
@@ -44,6 +50,7 @@ export const COMMANDS: Command[] = [
 	hosts,
 	hostnames,
 	services,
+	daemons,
 	disk,
 	agentLog,
 	board,
