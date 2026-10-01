@@ -6,6 +6,8 @@ import { newProject } from './commands/new';
 import { scan } from './commands/scan';
 import { open } from './commands/open';
 import { run } from './commands/run';
+import { ps } from './commands/ps';
+import { kill } from './commands/kill';
 import { pick } from './commands/pick';
 import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
@@ -31,6 +33,8 @@ export const COMMANDS: Command[] = [
 	scan,
 	open,
 	run,
+	ps,
+	kill,
 	pick,
 	jump,
 	search,
