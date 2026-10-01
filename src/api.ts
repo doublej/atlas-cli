@@ -21,28 +21,38 @@ export async function isUp(): Promise<boolean> {
 	}
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-	const r = await fetch(`${API_BASE}${path}`);
-	if (!r.ok) throw new Error(`GET ${path} → ${r.status} ${r.statusText}`);
+/**
+ * What a failed call says: the body's `error` (every atlas-api route answers `{ error }`), else its
+ * `message`, else the body text itself, else `fallback`. The status line alone hid the reason.
+ */
+async function errorText(r: Response, fallback: string): Promise<string> {
+	const text = (await r.text().catch(() => '')).trim();
+	try {
+		const body = JSON.parse(text) as { error?: unknown; message?: unknown };
+		if (typeof body?.error === 'string' && body.error) return body.error;
+		if (typeof body?.message === 'string' && body.message) return body.message;
+	} catch {
+		/* not JSON — the text is the message */
+	}
+	return text || fallback;
+}
+
+/** The one place a call reaches the API. A non-2xx answer throws its own error text. */
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+	const r = await fetch(`${API_BASE}${path}`, {
+		method,
+		...(method === 'GET'
+			? {}
+			: {
+					headers: { 'content-type': 'application/json' },
+					body: body === undefined ? undefined : JSON.stringify(body)
+				})
+	});
+	if (!r.ok) throw new Error(await errorText(r, `${method} ${path} → ${r.status} ${r.statusText}`));
 	return r.json() as Promise<T>;
 }
 
-export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-	const r = await fetch(`${API_BASE}${path}`, {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	if (!r.ok) throw new Error(`POST ${path} → ${r.status} ${r.statusText}`);
-	return r.json() as Promise<T>;
-}
-
-export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
-	const r = await fetch(`${API_BASE}${path}`, {
-		method: 'DELETE',
-		headers: { 'content-type': 'application/json' },
-		body: body === undefined ? undefined : JSON.stringify(body)
-	});
-	if (!r.ok) throw new Error(`DELETE ${path} → ${r.status} ${r.statusText}`);
-	return r.json() as Promise<T>;
-}
+export const apiGet = <T>(path: string): Promise<T> => request<T>('GET', path);
+export const apiPost = <T>(path: string, body?: unknown): Promise<T> => request<T>('POST', path, body);
+export const apiPatch = <T>(path: string, body?: unknown): Promise<T> => request<T>('PATCH', path, body);
+export const apiDelete = <T>(path: string, body?: unknown): Promise<T> => request<T>('DELETE', path, body);
