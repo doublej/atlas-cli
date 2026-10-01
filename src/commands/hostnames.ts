@@ -19,7 +19,7 @@ interface AssignResult {
 	remote?: string;
 }
 
-/** C.2 `GET /api/hostnames/check`: always 200, `status` carries the verdict. */
+/** C.2 `GET /api/hostnames/check`: 200 with the verdict in `status`; 400 for a path outside the catalog. */
 export interface CheckResult {
 	slug: string;
 	status: 'free' | 'current' | 'taken' | 'invalid';
