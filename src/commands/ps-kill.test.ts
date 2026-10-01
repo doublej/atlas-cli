@@ -128,6 +128,17 @@ describe('atlas kill', () => {
 		expect((posts[0].body as StopRequest).targets.map((t) => t.pid)).toEqual([101, 102]);
 	});
 
+	test('on a terminal it asks first: y stops, n declines with exit 4', async () => {
+		const yes = fresh();
+		const y = await yes.tty(['kill', '101'], 'y');
+		expect([y.code, y.out]).toEqual([0, expect.stringContaining('✓ done')]);
+		expect(yes.calls.filter((c) => c.method === 'POST').map((c) => (c.body as StopRequest).dryRun)).toEqual([true, false]);
+		const no = fresh();
+		const n = await no.tty(['kill', '101'], 'n');
+		expect([n.code, n.out]).toEqual([4, expect.stringContaining('declined')]);
+		expect(no.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+	}, 15_000);
+
 	test('an ambiguous project lists the candidates, exit 1', async () => {
 		const r = await fresh().cli(['kill', 'atla', '--dry-run']);
 		expect(r.code).toBe(1);

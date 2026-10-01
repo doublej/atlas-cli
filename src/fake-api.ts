@@ -46,6 +46,29 @@ export function fakeApi(routes: Record<string, Route>) {
 				proc.exited
 			]);
 			return { stdout, stderr, code };
+		},
+		/** On a terminal: `script` gives the CLI a pty, and `answer` is typed at its first y/N prompt. */
+		async tty(args: string[], answer: string) {
+			// script refuses a socket on stdin (Bun's pipes are sockets), so `cat` feeds it a real pipe.
+			// A CLI that never asks keeps cat waiting: the run then ends at the test's timeout.
+			const proc = Bun.spawn(['/bin/sh', '-c', 'cat | /usr/bin/script -q /dev/null "$@"', 'sh', 'bun', CLI, ...args], {
+				env: { ...process.env, ATLAS_API: `http://127.0.0.1:${server.port}` },
+				stdin: 'pipe',
+				stdout: 'pipe',
+				stderr: 'pipe'
+			});
+			const decoder = new TextDecoder();
+			let out = '';
+			let asked = false;
+			for await (const chunk of proc.stdout) {
+				out += decoder.decode(chunk);
+				if (!asked && out.includes('(y/N)')) {
+					asked = true;
+					proc.stdin.write(`${answer}\r`);
+					proc.stdin.end(); // cat exits, so the pipeline ends with the CLI
+				}
+			}
+			return { out: out.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''), code: await proc.exited };
 		}
 	};
 }
