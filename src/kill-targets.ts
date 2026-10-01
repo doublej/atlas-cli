@@ -31,7 +31,11 @@ export const portTargets = (listeners: ListenerRef[], port: number): NamedTarget
 		listeners.filter((l) => l.port === port).map((l) => ({ pid: l.pid, startedAt: l.startedAt, name: l.name }))
 	);
 
-/** Never stopped by a project query: agent sessions (their MCP servers fold into them), shells, editors' language servers. */
+/**
+ * Never stopped by a project query, as a row or as a member of one: agent sessions (their MCP
+ * servers fold into them), shells (an agent's Bash-tool `zsh -c` leads its command's group) and
+ * editors' language servers.
+ */
 const NOT_BY_PROJECT = new Set<ProcessKind>(['claude', 'codex', 'mcp', 'shell', 'language-server']);
 
 /**
@@ -54,7 +58,7 @@ export function projectTargets(
 	const targets = rows.flatMap((r) =>
 		r.pids.flatMap((pid) => {
 			const p = byPid.get(pid);
-			return p ? [{ pid, startedAt: p.startedAt, name: p.name }] : [];
+			return p && !NOT_BY_PROJECT.has(p.kind) ? [{ pid, startedAt: p.startedAt, name: p.name }] : [];
 		})
 	);
 	return { targets: unique(targets), candidates };

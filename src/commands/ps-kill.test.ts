@@ -161,14 +161,15 @@ describe('atlas kill <project> leaves agents, shells and its own process tree al
 	const SESSION = {
 		generatedAt: T,
 		rows: [
-			row({ primary: 101, pids: [101], kind: 'node', tool: 'vite', name: 'vite', project: atlas }),
+			row({ primary: 101, pids: [100, 101], kind: 'node', tool: 'vite', name: 'vite', project: atlas }),
 			row({ primary: 201, pids: [201, 202], kind: 'claude', name: 'claude', project: atlas }),
 			row({ primary: 301, pids: [301], kind: 'shell', name: 'zsh', project: atlas }),
 			row({ primary: 501, pids: [501], kind: 'python', name: 'notebook', project: atlas, dev: false }),
 			row({ primary: process.pid, pids: [process.pid], kind: 'bun', name: 'bun', project: atlas })
 		],
 		processes: [
-			proc(101, 'vite'),
+			{ ...proc(100, 'zsh', 'zsh -c bun run dev'), kind: 'shell' as const },
+			proc(101, 'vite', 'vite dev', 100),
 			{ ...proc(201, 'claude'), kind: 'claude' as const },
 			{ ...proc(202, 'consult-user-mcp', 'node mcp-server', 201), kind: 'mcp' as const },
 			{ ...proc(301, 'zsh'), kind: 'shell' as const },
@@ -179,7 +180,7 @@ describe('atlas kill <project> leaves agents, shells and its own process tree al
 	const targets = (s: ReturnType<typeof api>) =>
 		(s.calls.find((c) => c.method === 'POST')?.body as StopRequest | undefined)?.targets.map((t) => t.pid);
 
-	test('only dev rows that are not agents, MCP servers or shells; --all adds non-dev rows', async () => {
+	test('only dev rows and members that are not agents, MCP servers or shells; --all adds non-dev rows', async () => {
 		const s = fresh(undefined, SESSION);
 		const r = await s.cli(['kill', 'project-atlas', '--dry-run']);
 		expect([r.code, targets(s)]).toEqual([0, [101]]);
