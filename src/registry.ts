@@ -11,8 +11,6 @@ import { ps } from './commands/ps';
 import { kill } from './commands/kill';
 import { set } from './commands/set';
 import { daemons } from './commands/daemons';
-import { ps } from './commands/ps';
-import { kill } from './commands/kill';
 import { pick } from './commands/pick';
 import { jump, search } from './commands/search';
 import { ports } from './commands/ports';
@@ -39,6 +37,7 @@ export const COMMANDS: Command[] = [
 	scan,
 	open,
 	run,
+	stop,
 	ps,
 	kill,
 	pick,
