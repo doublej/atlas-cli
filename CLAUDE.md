@@ -22,7 +22,7 @@ src/
   registry.ts     COMMANDS table + usage() help text
   types.ts        Command interface { name, summary, run(args) }
   api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost/apiPatch/apiDelete — one request();
-                  a non-2xx answer throws the body's `error` (else `message`, else its text)
+                  a non-2xx answer throws the body's `error` (else `message`, else the status line)
   util.ts         die(), resolveRoot(), openUrl(), requireUp(), shellExec()/cdLine()
   tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
   logo.ts         atlas-picker's splash art, reused by `atlas help` (copy of splash.rs)
