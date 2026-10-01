@@ -35,9 +35,9 @@ const GUARDRAILS = [
 	'Only this Mac (host `m2`) is writable. Rows tagged `[fractal]`/`[ubuntu]` are read-only catalog entries.',
 	'Never edit `~/dev/.atlas-cache*.json`; run `atlas scan`. Per-project overrides go in `.atlas` (`atlas set`).',
 	'`kill`: always `--dry-run` first; without a terminal it needs `--yes`. `kill <project>` takes its dev processes only, never agent sessions, MCP servers or shells, and `kill` never targets its own shell or session. The server refuses atlas-api, launchd jobs and other users\' processes. A launchd job restarts through `atlas daemons restart`.',
-	'A `slug`, `port` or `devPublic` change (`atlas set`) moves the dev hostname: two new ACME certs. `atlas hostnames check <slug>` first, never in a loop.',
+	'A `slug`, `port` or `devPublic` change (`atlas set`) moves the dev hostname and reloads the shared NAS Caddy. `atlas hostnames check <slug>` first, never in a loop.',
 	'`flow init` always `--dry-run` first, one repo at a time. Never migrate in bulk.',
-	'Each dev hostname costs two ACME certs: `hostnames assign` only what you run, never in a loop.',
+	'Every `hostnames assign` reloads the shared NAS Caddy (a wildcard certificate covers the name): assign only what you run, never in a loop.',
 	'Never restart atlas-api (`daemons restart` refuses it): the CLI self-heals it. Never `launchctl kickstart -k` it.'
 ];
 

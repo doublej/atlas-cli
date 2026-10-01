@@ -27,8 +27,8 @@ Keys: ${ATLAS_KEYS.join(' ')}
 Values: port 4100 · archived, devPublic true|false · domains a.com b.com (or a JSON array) ·
 umami a website id (or JSON) · flow, agent-log a JSON object · slug, description, type, framework,
 domain plain text (\`slug 2048\` stays "2048"). Anything else is exit 1 before any write.
-A slug, port or devPublic change moves the project's dev hostname — two new ACME certificates each
-time, so never in a loop.`;
+A slug, port or devPublic change moves the project's dev hostname and reloads the shared NAS Caddy
+(the wildcard certificate covers it), so never in a loop.`;
 
 const json = (raw: string): unknown => {
 	try {

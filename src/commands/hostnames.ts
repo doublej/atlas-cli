@@ -63,7 +63,7 @@ async function check(slug: string, pathArg: string | undefined, json: boolean): 
 }
 
 const USAGE = `Usage: atlas hostnames [list] [--json]
-       atlas hostnames assign [path] [--json]    route the project's dev hostname (two ACME certificates)
+       atlas hostnames assign [path] [--json]    route the project's dev hostname (reloads the NAS Caddy)
        atlas hostnames rm [path] [--json]
        atlas hostnames check <slug> [path] [--json]   free · current · taken by … · invalid: … (exit 1 unless free/current)
        atlas hostnames doctor [--fix] [--json]   drift between rows, .atlas, Caddy and the NAS (exit 1 while any remains)`;
