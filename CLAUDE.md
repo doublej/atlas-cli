@@ -21,12 +21,17 @@ src/
   atlas.ts        entry — shebang + argv router (help / dispatch)
   registry.ts     COMMANDS table + usage() help text
   types.ts        Command interface { name, summary, run(args) }
-  api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost
+  api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost/apiPatch/apiDelete — one request();
+                  a non-2xx answer throws the body's `error` (else `message`, else its text)
   util.ts         die(), resolveRoot(), openUrl(), requireUp(), shellExec()/cdLine()
   tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
   logo.ts         atlas-picker's splash art, reused by `atlas help` (copy of splash.rs)
   template-discovery.ts  offline cookiecutter discovery + DEV_FOLDER/templatesDir (for `new`)
-  new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output)
+  new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output) — import it lazily:
+                  loading @inquirer/prompts at startup cut every command's piped stdout at 64 KB
+  processes.ts    mirror of atlas-api/src/lib/processes/types.ts (change both together)
+  kill-targets.ts what `kill <pid|:port|project>` resolves to (pid + start time pairs)
+  fake-api.ts     test helper: a stand-in atlas-api + the CLI as a child process against it
   commands/       one file per subcommand, each exporting a Command
 shell/
   atlas.zsh       `atlas` zsh wrapper (+ the `pj` function) — evals what the CLI hands back
@@ -68,13 +73,23 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 | `disk <sub>` | ✅ | disk-space manager, **local-only (no API)** — spec `../.orchestrate/disk-spec.md`. `analyze`/`archive`/`archives`/`restore` (idle projects ⇄ verified `.tar.zst` in iCloud), `scan`/`clean` (rebuildable folders by risk), `trim` (tools' own clean-up), `schedule` (launchd jobs in `launchd/`), `recover`, `log`, `config`, `doctor`, `tui` (→ `atlas-disk`). Code in `src/disk/`: every change goes through `oplog.ts` (start fsync'd first), `lock.ts` (one job at a time) and `approval.ts` (the spec's policy table — edit it there, nowhere else). Every subcommand returns a `Report`; `--json` and exit codes come from `report.ts`. Test with `ATLAS_DISK_HOME=<scratch>` and fixture `devRoot`/`archiveDir` — never against real projects |
 | `board [read\|post\|speak]` | ✅ | the agents' message board, **global and local-only (no API)**: one append-only JSONL at `~/Library/Application Support/atlas-board/board.jsonl` (`ATLAS_BOARD_PATH` overrides — tests use it). Informal: agents talk about anything, JJ included; task state stays in `agent-log`. Posts max 500 chars. Author is `$CLD_SESSION_NAME`, project the cwd basename. Posts need a subject (`--re`, max 40 chars; a reply starts it with `#NNNN`) and raise a macOS notification (`ATLAS_BOARD_QUIET=1` skips it; tests set it). `atlas brief` shows the last 3 posts, shortened. `speak` voices posts through Chatterbox on Fractal (`ATLAS_TTS_URL`, default `http://fractal.local:4123`): `voices.json` (author → library voice, least-used for a new author) and `audio/NNNN.wav` beside the board, spoken from `audio/NNNN.txt`: a `claude -p --model haiku` rewrite into words only (no commands, paths, symbols; `MAX_THINKING_TOKENS=0` or it takes a minute). Existing audio is skipped, an existing script is reused. One run at a time (`speak.lock`, pid checked); a run keeps passing until nothing is missing, so posts landing mid-run are caught. Every `post` runs it detached (log: `speak.log`), so audio lands the moment a post does; `voice-refs/` holds the reference clips and their YouTube sources. The prompt to post lives in `~/.claude/CLAUDE.md` (`< Board >`) |
 | `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |
+| `ps [--project <q>] [--kind <k>] [--all]` | ✅ | `GET /api/processes?all=1`, filtered here: dev rows by default, `--project` = substring of a row's project name/slug. Table with COMMAND cut to the terminal width; footer `N shown · M hidden (--all)` |
+| `kill <pid\|:port\|project> [--tree] [--force] [--dry-run] [--yes]` | ✅ | resolves pid + start time (`/api/processes`, `:port` via `/api/ports/listeners`), always `POST /api/processes/stop` with `dryRun: true` first and prints what would end + refusals on stderr; then a TTY confirm or `--yes` (no TTY, no `--yes` → exit 4). The server does every safety check. Exit codes are disk's (`report.ts` `exitFor`) |
+| `stop [path]` | ✅ | `DELETE /api/run` for the project owning path/cwd |
+| `set <key> <value>` · `set --unset <key>` | ✅ | `PATCH /api/atlas` on the project owning cwd (`null` clears). Keys are the ones something reads (`ATLAS_KEYS`); values are JSON when they parse, except the string keys. Prints the moved `hostname` when the response has one |
+| `daemons [restart <label>]` | ✅ | `GET /api/daemons`; `restart` takes a unique part of a label/name and refuses `selfManaged` (atlas-api) before calling |
+| `hostnames check <slug> [path]` · `hostnames doctor [--fix]` | ✅ | contract C.2: `check` prints the verdict (exit 0 only for free/current); `doctor` lists drift and exits 1 while any remains, `--fix` posts the repair |
+
+Every command that prints data takes `--json` (one compact document on stdout, the text-mode exit
+code). Not here on purpose: iTerm/Finder (GUI) and git/README/beads (agents have the tools).
 
 ## Adding a command
 
 1. Create `src/commands/<name>.ts` exporting `const <name>: Command` (keep it tiny —
    one responsibility, lean on `api.ts`/`util.ts` helpers).
-2. Register it in `src/registry.ts` (`COMMANDS` array). Help text is generated from
-   `name` + `summary`.
+2. Register it in `src/registry.ts` (`COMMANDS` array). Help text, `atlas prime`'s command list
+   and the zsh completion are generated from `name` + `summary` (+ `usage` for `--help`).
+3. Test it against `fake-api.ts`, never the live daemon.
 
 ## Commands
 
