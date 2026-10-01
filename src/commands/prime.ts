@@ -42,7 +42,7 @@ const GUARDRAILS = [
 ];
 
 const OUTPUT = [
-	'Human text on stdout. `--json` on every command that prints data: one document on stdout (compact; `info`, `prime`, `disk` pretty), same exit code as the text. None on `open`, `pick`, `jump`, `tree web`, `init`, `new`, `install-autocompletion`.',
+	'Human text on stdout. `--json` on every command that prints data: one document on stdout (compact; `info`, `prime`, `disk` pretty), same exit code as the text. Text only, `--json` ignored or refused: `open`, `pick`, `jump`, `tree web`, `init`, `new`, `install-autocompletion`, `hosts sync`, `flow init`, `board post|speak`, and `agent-log` except `recent`/`status` (`hook` always prints JSON).',
 	'Errors: the API\'s own message, one line on stderr. `disk --json` prints `{command, exit, error}` on stdout instead.',
 	'Exit: 0 ok · 1 error, or a problem found (`ports` collisions, `hostnames check` neither free nor current, `hostnames doctor` drift left, `templates lint` errors) · 2 nothing to do · 3 partly failed · 4 refused or needs `--yes` (2–4: `disk`, `kill`).',
 	'`atlas <anything that isn\'t a command>` is a project search.',

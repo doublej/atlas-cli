@@ -61,7 +61,7 @@ export const findCommand = (name: string): Command | undefined =>
 	COMMANDS.find((c) => c.name === name);
 
 /** How to read further, and what is left out on purpose (agents have better tools for those). */
-export const HELP_FOOTER = `\`atlas <command> --help\` for flags. \`--json\` on every command that prints data; \`atlas prime\` for the agent contract.
+export const HELP_FOOTER = `\`atlas <command> --help\` for flags. \`--json\` on every command that prints data, except the text-only ones \`atlas prime\` lists.
 Not here on purpose: iTerm/Finder (GUI only, in the web console) and git, README, beads (use git, cat, bd directly).`;
 
 export function usage(): string {

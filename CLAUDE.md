@@ -81,7 +81,8 @@ only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from
 | `hostnames check <slug> [path]` · `hostnames doctor [--fix]` | ✅ | contract C.2: `check` prints the verdict (exit 0 only for free/current); `doctor` lists drift and exits 1 while any remains, `--fix` posts the repair |
 
 Every command that prints data takes `--json` (one compact document on stdout, the text-mode exit
-code). Not here on purpose: iTerm/Finder (GUI) and git/README/beads (agents have the tools).
+code). The text-only exceptions are listed in `prime.ts` `OUTPUT` — keep that list true when a
+subcommand gains or lacks `--json`. Not here on purpose: iTerm/Finder (GUI) and git/README/beads (agents have the tools).
 
 ## Adding a command
 
