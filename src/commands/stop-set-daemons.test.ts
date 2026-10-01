@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fakeApi } from '../fake-api';
+import { parseValue } from './set';
 
 // A real folder: `set` acts on the project owning the child's cwd.
 const root = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-cli-')));
@@ -66,6 +67,38 @@ describe('atlas set', () => {
 		expect([typo.code, typo.stderr]).toEqual([1, expect.stringContaining('Unknown .atlas key "prot"')]);
 		expect((await s.cli(['set', 'port'], root)).code).toBe(1);
 		expect(s.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+	});
+
+	test('each key takes its own type: loose input, strict value, undefined when it is not one', () => {
+		const cases: [string, string, unknown][] = [
+			['port', '4100', 4100],
+			['port', '41.5', undefined],
+			['port', '"4100"', undefined],
+			['archived', 'false', false],
+			['archived', 'no', undefined],
+			['devPublic', 'yes', undefined],
+			['domains', 'foo.org', ['foo.org']],
+			['domains', 'a.com, b.com', ['a.com', 'b.com']],
+			['domains', '["a.com"]', ['a.com']],
+			['domains', '42', undefined],
+			['flow', '{"trunk":"main"}', { trunk: 'main' }],
+			['flow', 'gitflow', undefined],
+			['agent-log', '["warn"]', undefined],
+			['umami', 'c0ffee-1d', 'c0ffee-1d'],
+			['umami', '{"instance":"https://u.example"}', undefined],
+			['slug', '2048', '2048'],
+			['description', ' ', undefined]
+		];
+		expect(cases.map(([key, raw]) => [key, raw, parseValue(key, raw)])).toEqual(cases);
+	});
+
+	test('a value of the wrong type is exit 1 naming the type, before any write', async () => {
+		const s = api({ 'PATCH /api/atlas': { atlas: {} } });
+		const r = await s.cli(['set', 'archived', 'no'], root);
+		expect([r.code, r.stderr.trim()]).toEqual([1, 'archived takes true or false, not "no"']);
+		expect(s.calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+		await s.cli(['set', 'domains', 'foo.org'], root);
+		expect(patched(s)).toEqual({ path: root, patch: { domains: ['foo.org'] } });
 	});
 
 	test('a 409 from the server is the message', async () => {
