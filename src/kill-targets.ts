@@ -1,5 +1,5 @@
 // What `atlas kill <pid | :port | project>` means, as pid + start time pairs. Pure over API answers.
-import type { ProcessSnapshot, StopTarget } from './processes';
+import type { ProcessKind, ProcessSnapshot, StopTarget } from './processes';
 
 export interface NamedTarget extends StopTarget {
 	name: string;
@@ -31,16 +31,20 @@ export const portTargets = (listeners: ListenerRef[], port: number): NamedTarget
 		listeners.filter((l) => l.port === port).map((l) => ({ pid: l.pid, startedAt: l.startedAt, name: l.name }))
 	);
 
+/** Never stopped by a project query: agent sessions (their MCP servers fold into them), shells, editors' language servers. */
+const NOT_BY_PROJECT = new Set<ProcessKind>(['claude', 'codex', 'mcp', 'shell', 'language-server']);
+
 /**
- * Every member of every row of one project: an exact name/slug first, else a substring of either
- * (as `atlas ps --project`). Several projects matching is ambiguous — `candidates` lists them.
+ * Every member of every dev row of one project (`all` adds non-dev rows): an exact name/slug first,
+ * else a substring of either. Several projects matching is ambiguous — `candidates` lists them.
  */
 export function projectTargets(
 	snap: ProcessSnapshot,
-	query: string
+	query: string,
+	all = false
 ): { targets: NamedTarget[]; candidates: string[] } {
 	const q = query.toLowerCase();
-	const owned = snap.rows.filter((r) => r.project);
+	const owned = snap.rows.filter((r) => r.project && !NOT_BY_PROJECT.has(r.kind) && (all || r.dev));
 	const names = (r: (typeof owned)[number]) => [r.project!.name, r.project!.slug].map((v) => v?.toLowerCase());
 	const exact = owned.filter((r) => names(r).includes(q));
 	const rows = exact.length ? exact : owned.filter((r) => names(r).some((v) => v?.includes(q)));
@@ -54,4 +58,12 @@ export function projectTargets(
 		})
 	);
 	return { targets: unique(targets), candidates };
+}
+
+/** `self` and every ancestor the snapshot knows (the shell and agent session running the CLI). */
+export function ancestry(snap: ProcessSnapshot, self: number, parent: number): Set<number> {
+	const ppid = new Map(snap.processes.map((p) => [p.pid, p.ppid]));
+	const seen = new Set([self]);
+	for (let pid = parent; pid > 1 && !seen.has(pid); pid = ppid.get(pid) ?? 0) seen.add(pid);
+	return seen;
 }

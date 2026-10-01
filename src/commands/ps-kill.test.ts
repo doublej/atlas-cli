@@ -14,7 +14,7 @@ const row = (o: Partial<AppRow> & Pick<AppRow, 'primary' | 'pids' | 'kind' | 'na
 	flags: [],
 	...o
 });
-const proc = (pid: number, name: string, command = `${name} --serve`): ProcessInfo => ({ pid, startedAt: T, kind: 'node', name, command });
+const proc = (pid: number, name: string, command = `${name} --serve`, ppid = 1): ProcessInfo => ({ pid, ppid, startedAt: T, kind: 'node', name, command });
 
 const atlas = { name: 'project-atlas', slug: 'atlas', path: '/dev/atlas' };
 const SNAP = {
@@ -43,16 +43,16 @@ const stopper =
 		};
 	};
 
-function api(stop = stopper()) {
+function api(stop = stopper(), snap: object = SNAP) {
 	return fakeApi({
-		'GET /api/processes': SNAP,
+		'GET /api/processes': snap,
 		'GET /api/ports/listeners': { listeners: [{ port: 4100, pid: 101, name: 'vite', startedAt: T }], updatedAt: T },
 		'POST /api/processes/stop': stop
 	});
 }
 const servers: ReturnType<typeof api>[] = [];
-const fresh = (stop?: ReturnType<typeof stopper>) => {
-	const s = api(stop);
+const fresh = (stop?: ReturnType<typeof stopper>, snap?: object) => {
+	const s = api(stop, snap);
 	servers.push(s);
 	return s;
 };
@@ -109,11 +109,12 @@ describe('atlas kill', () => {
 		const r = await s.cli(['kill', ':4100', '--yes', '--json']);
 		expect(r.code).toBe(0);
 		expect(s.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+			'GET /api/processes?all=1&fresh=1',
 			'GET /api/ports/listeners',
 			'POST /api/processes/stop',
 			'POST /api/processes/stop'
 		]);
-		expect((s.calls[2].body as StopRequest).dryRun).toBe(false);
+		expect((s.calls[3].body as StopRequest).dryRun).toBe(false);
 		expect((JSON.parse(r.stdout) as StopResponse).results[0].status).toBe('stopped');
 	});
 
@@ -152,5 +153,46 @@ describe('atlas kill', () => {
 		servers.push(s as ReturnType<typeof api>);
 		const r = await s.cli(['kill', '101', '--yes']);
 		expect([r.code, r.stderr.trim()]).toEqual([1, 'targets required']);
+	});
+});
+
+describe('atlas kill <project> leaves agents, shells and its own process tree alone', () => {
+	// The spawned CLI's parent is this test runner: a bun row in the project, as when an agent runs it.
+	const SESSION = {
+		generatedAt: T,
+		rows: [
+			row({ primary: 101, pids: [101], kind: 'node', tool: 'vite', name: 'vite', project: atlas }),
+			row({ primary: 201, pids: [201, 202], kind: 'claude', name: 'claude', project: atlas }),
+			row({ primary: 301, pids: [301], kind: 'shell', name: 'zsh', project: atlas }),
+			row({ primary: 501, pids: [501], kind: 'python', name: 'notebook', project: atlas, dev: false }),
+			row({ primary: process.pid, pids: [process.pid], kind: 'bun', name: 'bun', project: atlas })
+		],
+		processes: [
+			proc(101, 'vite'),
+			{ ...proc(201, 'claude'), kind: 'claude' as const },
+			{ ...proc(202, 'consult-user-mcp', 'node mcp-server', 201), kind: 'mcp' as const },
+			{ ...proc(301, 'zsh'), kind: 'shell' as const },
+			proc(501, 'jupyter'),
+			proc(process.pid, 'bun', 'bun test', process.ppid)
+		]
+	};
+	const targets = (s: ReturnType<typeof api>) =>
+		(s.calls.find((c) => c.method === 'POST')?.body as StopRequest | undefined)?.targets.map((t) => t.pid);
+
+	test('only dev rows that are not agents, MCP servers or shells; --all adds non-dev rows', async () => {
+		const s = fresh(undefined, SESSION);
+		const r = await s.cli(['kill', 'project-atlas', '--dry-run']);
+		expect([r.code, targets(s)]).toEqual([0, [101]]);
+		expect(r.stderr).toContain(`skipping ${process.pid} bun`);
+		const all = fresh(undefined, SESSION);
+		await all.cli(['kill', 'atlas', '--all', '--dry-run']);
+		expect(targets(all)).toEqual([101, 501]);
+	});
+
+	test('a pid in its own ancestry is refused before any stop call, exit 4', async () => {
+		const s = fresh(undefined, SESSION);
+		const r = await s.cli(['kill', String(process.pid), '--yes']);
+		expect([r.code, targets(s)]).toEqual([4, undefined]);
+		expect(r.stderr).toContain('the shell/session running it');
 	});
 });

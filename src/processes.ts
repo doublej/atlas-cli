@@ -38,6 +38,7 @@ export interface ProcessProject {
 
 export interface ProcessInfo {
 	pid: number;
+	ppid: number;
 	/** pid + startedAt is a process's identity; a reused pid has another start. */
 	startedAt: string;
 	kind: ProcessKind;

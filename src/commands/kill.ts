@@ -6,15 +6,17 @@ import { confirm } from '../disk/approval';
 import { EXIT, exitFor, renderItems, type ItemReport } from '../disk/report';
 import type { Outcome } from '../disk/oplog';
 import type { ProcessSnapshot, StopRefusal, StopRequest, StopResponse, StopResult } from '../processes';
-import { type ListenerRef, type NamedTarget, pidTargets, portTargets, projectTargets, targetKind } from '../kill-targets';
+import { ancestry, type ListenerRef, type NamedTarget, pidTargets, portTargets, projectTargets, targetKind } from '../kill-targets';
 
-const USAGE = `Usage: atlas kill <pid | :port | project> [--tree] [--force] [--dry-run] [--yes] [--json]
+const USAGE = `Usage: atlas kill <pid | :port | project> [--tree] [--force] [--all] [--dry-run] [--yes] [--json]
 
 Stops processes through atlas-api, which re-checks every target (pid + start time) and refuses
-pid ≤ 1, atlas-api itself, other users' processes, launchd jobs and zombies.
+pid ≤ 1, atlas-api itself, other users' processes, launchd jobs and zombies. This command never
+targets itself or its ancestors (the shell and agent session running it).
 
   <pid>       one process            :<port>    whatever listens on that port
-  <project>   every process of that project (name or slug, as \`atlas ps --project\`)
+  <project>   that project's dev processes (name or slug, as \`atlas ps --project\`) — never its
+              agent sessions, MCP servers, shells or language servers; --all adds non-dev rows
   --tree      also its descendants   --force    SIGKILL what still runs 5s after SIGTERM
   --dry-run   show what would stop and what is refused; signal nothing
   --yes       skip the confirmation (required without a terminal)
@@ -64,20 +66,27 @@ export function renderPreview(res: StopResponse, items: ItemReport[]): string {
 	].join('\n');
 }
 
-async function resolve(target: string): Promise<NamedTarget[]> {
+async function find(target: string, snap: ProcessSnapshot, all: boolean): Promise<NamedTarget[]> {
 	const kind = targetKind(target);
 	if (kind === 'port') {
 		const { listeners } = await apiGet<{ listeners: ListenerRef[] }>('/api/ports/listeners');
 		return portTargets(listeners, Number(target.slice(1)));
 	}
-	const snap = await apiGet<ProcessSnapshot>('/api/processes?all=1');
 	if (kind === 'pid') return pidTargets(snap, Number(target));
-	const { targets, candidates } = projectTargets(snap, target);
+	const { targets, candidates } = projectTargets(snap, target, all);
 	if (candidates.length > 1) die(`"${target}" matches processes of ${candidates.length} projects:\n  ${candidates.join('\n  ')}`);
 	return targets;
 }
 
-/** `atlas kill` — resolve, dry-run, confirm, stop. The server does every safety check. */
+/** What `target` means, split into what may stop and this command's own process tree (`own`). */
+async function resolve(target: string, all = false): Promise<{ targets: NamedTarget[]; own: NamedTarget[] }> {
+	const snap = await apiGet<ProcessSnapshot>('/api/processes?all=1&fresh=1');
+	const found = await find(target, snap, all);
+	const self = ancestry(snap, process.pid, process.ppid);
+	return { targets: found.filter((t) => !self.has(t.pid)), own: found.filter((t) => self.has(t.pid)) };
+}
+
+/** `atlas kill` — resolve, dry-run, confirm, stop. Past target selection, the server does every safety check. */
 export const kill: Command = {
 	name: 'kill',
 	summary: 'stop processes by pid, :port or project (always --dry-run first)',
@@ -89,6 +98,7 @@ export const kill: Command = {
 			options: {
 				tree: { type: 'boolean' },
 				force: { type: 'boolean' },
+				all: { type: 'boolean' },
 				'dry-run': { type: 'boolean' },
 				yes: { type: 'boolean' },
 				json: { type: 'boolean' }
@@ -96,10 +106,11 @@ export const kill: Command = {
 		});
 		if (positionals.length !== 1) die(USAGE);
 		await requireUp();
-		const named = await resolve(positionals[0]);
+		const { targets: named, own } = await resolve(positionals[0], values.all);
+		if (own.length) console.error(`skipping ${own.map((t) => `${t.pid} ${t.name}`).join(', ')}: this command or the shell/session running it`);
 		if (!named.length) {
-			console.error(`Nothing matches ${positionals[0]}. See: atlas ps --all`);
-			return void (process.exitCode = EXIT.nothing);
+			if (!own.length) console.error(`Nothing matches ${positionals[0]}. See: atlas ps --all`);
+			return void (process.exitCode = own.length ? EXIT.refused : EXIT.nothing);
 		}
 		const names = new Map(named.map((t) => [t.pid, t.name]));
 		const body: StopRequest = { targets: named.map(({ pid, startedAt }) => ({ pid, startedAt })), tree: values.tree, force: values.force };
