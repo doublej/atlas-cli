@@ -111,8 +111,13 @@ export const search: Command = {
 	summary: 'find projects by name (also: atlas <query>)',
 	async run(args) {
 		if (args.some((a) => RUN_FLAGS.includes(a))) return jump.run(args);
-		const { query } = splitRun(args);
+		const { query } = splitRun(args.filter((a) => a !== '--json'));
 		const found = await findProjects(query);
+		// The absolute path too, so a row feeds `atlas info <path>` directly.
+		if (args.includes('--json'))
+			return console.log(
+				JSON.stringify(found.map(({ name, slug, path, relativePath, host, isLocal }) => ({ name, slug, path, relativePath, host, isLocal })))
+			);
 		const width = Math.max(...found.map((p) => p.name.length));
 		for (const p of found) {
 			const where = p.isLocal ? '' : `  [${p.host ?? 'remote'}]`;

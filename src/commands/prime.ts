@@ -2,7 +2,7 @@
  * `atlas prime` — the agent crash course: what atlas is, the command surface, the
  * workflows, the guardrails, and what it detects about where you are. Markdown by
  * default (the reader is an agent's reasoning, not a parser), `--json` for the model.
- * The command list lives in `atlas help`; prime only points at it.
+ * The command list is rendered from COMMANDS, so it cannot drift from `atlas help`.
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,7 +19,11 @@ const WORKFLOWS: [string, string[]][] = [
 	['Find a project', ['atlas search <q>', 'atlas info <path> --json']],
 	['Start a project', ['atlas templates', 'atlas new <family/name> --name <n> --category <cat> [--var k=v]']],
 	['Free disk space', ['atlas disk analyze --json  # then: atlas disk archive <category/project> --dry-run', 'atlas disk scan --json  # clean: atlas disk clean <path> --unattended (policy-gated)', 'atlas disk doctor']],
-	['Run it', ['atlas run [path]  # prints the dev hostname; atlas follows the port the server binds']],
+	['Run it', ['atlas run [path]  # prints the dev hostname; atlas follows the port the server binds', 'atlas stop [path]']],
+	['Processes', ['atlas ps [--project <q>] [--all] --json  # what runs, by project', 'atlas kill <pid|:port|project> --dry-run  # then the same with --yes']],
+	['Project settings', ['atlas set <key> <value>  # one .atlas override: slug, port, description, …', 'atlas set --unset <key>']],
+	['Hostnames', ['atlas hostnames check <slug>  # free · current · taken by … · invalid: …', 'atlas hostnames doctor --json  # then: atlas hostnames doctor --fix']],
+	['Daemons', ['atlas daemons --json', 'atlas daemons restart <label>']],
 	['Load its context', ['atlas tree compose [path]  # the CLAUDE.md chain as one doc', 'atlas tree search <q>']],
 	['Branch flow', ['atlas flow', 'atlas flow init --dry-run  # then without --dry-run']],
 	["Say what's on your mind", ['atlas board  # read the other agents first', 'atlas board post --re "<subject>" <text>  # thoughts, not programming; max 500 chars']],
@@ -29,16 +33,20 @@ const WORKFLOWS: [string, string[]][] = [
 const GUARDRAILS = [
 	'`jump`, `pick`, `open` are for humans (shell wrapper, TTY, browser). Agents use `search` + `info`.',
 	'Only this Mac (host `m2`) is writable. Rows tagged `[fractal]`/`[ubuntu]` are read-only catalog entries.',
-	'Never edit `~/dev/.atlas-cache*.json`; run `atlas scan`. Per-project overrides go in `.atlas` (`atlas init`).',
+	'Never edit `~/dev/.atlas-cache*.json`; run `atlas scan`. Per-project overrides go in `.atlas` (`atlas set`).',
+	'`kill`: always `--dry-run` first; without a terminal it needs `--yes`. `kill <project>` takes its dev processes only, never agent sessions, MCP servers or shells, and `kill` never targets its own shell or session. The server refuses atlas-api, launchd jobs and other users\' processes. A launchd job restarts through `atlas daemons restart`.',
+	'A `slug`, `port` or `devPublic` change (`atlas set`) moves the dev hostname: two new ACME certs. `atlas hostnames check <slug>` first, never in a loop.',
 	'`flow init` always `--dry-run` first, one repo at a time. Never migrate in bulk.',
 	'Each dev hostname costs two ACME certs: `hostnames assign` only what you run, never in a loop.',
-	'The CLI restarts the atlas-api daemon itself. Never `launchctl kickstart -k` it.'
+	'Never restart atlas-api (`daemons restart` refuses it): the CLI self-heals it. Never `launchctl kickstart -k` it.'
 ];
 
 const OUTPUT = [
-	'Human text on stdout; `--json` on `info`, `brief` and `agent-log` for machine reads.',
-	'Errors: one line on stderr, exit 1. `ports` also exits 1 when it finds collisions.',
-	'`atlas <anything that isn\'t a command>` is a project search.'
+	'Human text on stdout. `--json` on every command that prints data: one document on stdout (compact; `info`, `prime`, `disk` pretty), same exit code as the text. Text only, `--json` ignored or refused: `open`, `pick`, `jump`, `tree web`, `init`, `new`, `install-autocompletion`, `hosts sync`, `flow init`, `board post|speak`, and `agent-log` except `recent`/`status` (`hook` always prints JSON).',
+	'Errors: the API\'s own message, one line on stderr. `disk --json` prints `{command, exit, error}` on stdout instead.',
+	'Exit: 0 ok · 1 error, or a problem found (`ports` collisions, `hostnames check` neither free nor current, `hostnames doctor` drift left, `templates lint` errors) · 2 nothing to do · 3 partly failed · 4 refused or needs `--yes` (2–4: `disk`, `kill`).',
+	'`atlas <anything that isn\'t a command>` is a project search.',
+	'Not in atlas on purpose: iTerm/Finder (GUI; the web console has them), git, README, beads (use git, cat, bd directly).'
 ];
 
 type Detected = { cwd: string; api: string; project?: string; catalog?: string };
@@ -61,11 +69,18 @@ async function detect(): Promise<Detected> {
 	};
 }
 
-function render(d: Detected): string {
+/** The registry, loaded late: it imports this command, so a static import would be circular. */
+async function commandList(): Promise<{ name: string; summary: string }[]> {
+	const { COMMANDS } = await import('../registry');
+	return COMMANDS.map(({ name, summary }) => ({ name, summary }));
+}
+
+function render(d: Detected, commands: { name: string; summary: string }[]): string {
 	const list = (xs: string[]) => xs.map((x) => `- ${x}`).join('\n');
 	const workflows = WORKFLOWS.map(([goal, steps]) => `**${goal}**\n\`\`\`sh\n${steps.join('\n')}\n\`\`\``).join('\n\n');
 	const detected = Object.entries(d).filter(([, v]) => v).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-	return `# atlas ${pkg.version}\n\n${PURPOSE}\n\n## Commands\n\`atlas help\` lists them; \`atlas <command> --help\` for flags.\n\n## Workflows\n${workflows}\n\n## Guardrails\n${list(GUARDRAILS)}\n\n## Output contract\n${list(OUTPUT)}\n\n## Detected\n${detected}\n`;
+	const cmds = commands.map((c) => `- \`${c.name}\` — ${c.summary}`).join('\n');
+	return `# atlas ${pkg.version}\n\n${PURPOSE}\n\n## Commands\n${cmds}\n\n\`atlas <command> --help\` for flags.\n\n## Workflows\n${workflows}\n\n## Guardrails\n${list(GUARDRAILS)}\n\n## Output contract\n${list(OUTPUT)}\n\n## Detected\n${detected}\n`;
 }
 
 /** `atlas prime [--json]` — the crash course on using atlas. */
@@ -74,9 +89,9 @@ export const prime: Command = {
 	summary: 'crash course for agents: workflows, guardrails, detected state',
 	usage: 'atlas prime [--json]  — Markdown primer; --json emits the same model',
 	async run(args) {
-		const detected = await detect();
-		if (!args.includes('--json')) return console.log(render(detected));
+		const [detected, commands] = await Promise.all([detect(), commandList()]);
+		if (!args.includes('--json')) return console.log(render(detected, commands));
 		const workflows = WORKFLOWS.map(([goal, steps]) => ({ goal, steps }));
-		console.log(JSON.stringify({ name: 'atlas', version: pkg.version, purpose: PURPOSE, workflows, guardrails: GUARDRAILS, output: OUTPUT, detected }, null, 2));
+		console.log(JSON.stringify({ name: 'atlas', version: pkg.version, purpose: PURPOSE, commands, workflows, guardrails: GUARDRAILS, output: OUTPUT, detected }, null, 2));
 	}
 };

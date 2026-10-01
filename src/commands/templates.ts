@@ -58,8 +58,12 @@ function statusFor(t: Template, lint: LintEntry[], errors: TemplateError[]): 'ok
 	return 'ok';
 }
 
-async function list(): Promise<void> {
+async function list(json: boolean): Promise<void> {
 	const { templates, errors = [], lint = [] } = await fetchTemplates();
+	if (json) {
+		const rows = templates.map((t) => ({ family: t.family, name: t.name, version: t.version ?? null, vars: t.variables.length, status: statusFor(t, lint, errors) }));
+		return void console.log(JSON.stringify(rows));
+	}
 	if (!templates.length) return void console.log('No templates found.');
 
 	const rows = templates.map((t) => ({
@@ -86,8 +90,10 @@ async function list(): Promise<void> {
 	if (errors.length) console.log(`\n${errors.length} template(s) failed to parse — see \`atlas templates lint\`.`);
 }
 
-async function lint(): Promise<void> {
+async function lint(json: boolean): Promise<void> {
 	const { errors = [], lint: entries = [] } = await fetchTemplates();
+	if (errors.length || entries.some((l) => l.level === 'error')) process.exitCode = 1;
+	if (json) return void console.log(JSON.stringify({ errors, lint: entries }));
 
 	if (errors.length) {
 		console.log(`Parse errors (${errors.length}):`);
@@ -102,17 +108,16 @@ async function lint(): Promise<void> {
 	}
 
 	if (!errors.length && !entries.length) console.log('No lint findings.');
-
-	if (errors.length || entries.some((l) => l.level === 'error')) process.exitCode = 1;
 }
 
 export const templates: Command = {
 	name: 'templates',
 	summary: 'list cookiecutter templates and lint findings',
 	async run(args) {
-		const [sub] = args;
-		if (sub === 'lint') await lint();
-		else if (!sub || sub === 'list') await list();
+		const [sub] = args.filter((a) => !a.startsWith('-'));
+		const json = args.includes('--json');
+		if (sub === 'lint') await lint(json);
+		else if (!sub || sub === 'list') await list(json);
 		else die(`Unknown subcommand '${sub}'. Usage: atlas templates [list|lint]`);
 	}
 };

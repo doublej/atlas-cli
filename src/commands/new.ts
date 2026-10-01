@@ -7,7 +7,7 @@ import { bootstrapJournal } from '../agent-log/init';
 import { bootstrapFlow } from './flow';
 import { getCategoryTemplates } from '../../../shared/templates';
 import { DEV_FOLDER, discoverTemplates, templatesDir, type Template } from '../template-discovery';
-import { pickCategory, pickOutputDir, pickTemplate, type Category } from '../new-prompts';
+import type { Category } from '../new-prompts';
 import { cdLine, die, shellExec } from '../util';
 
 const NEW_USAGE = `atlas new — scaffold a project from a cookiecutter template
@@ -184,6 +184,8 @@ async function scaffoldDirect(a: DirectArgs): Promise<void> {
 }
 
 async function scaffoldFlow(): Promise<void> {
+	// Lazy: importing @inquirer/prompts at load time cuts every command's piped stdout off at 64 KB.
+	const { pickCategory, pickOutputDir, pickTemplate } = await import('../new-prompts');
 	const online = await isUp();
 	const category = await pickCategory(await loadCategories(online));
 	const templates = await loadTemplates(online);
@@ -200,9 +202,12 @@ async function scaffoldFlow(): Promise<void> {
 export const newProject: Command = {
 	name: 'new',
 	summary: 'scaffold a new project from a cookiecutter template',
+	usage: NEW_USAGE,
 	async run(args) {
 		const parsed = parseNewArgs(args);
 		if (parsed === 'help') return void console.log(NEW_USAGE);
+		if (!parsed && !process.stdin.isTTY)
+			die(`atlas new needs a terminal for its pickers. Without one:\n  atlas new <family/name> --name <name> --category <cat>   (templates: atlas templates)`);
 		try {
 			if (parsed) await scaffoldDirect(parsed);
 			else await scaffoldFlow();

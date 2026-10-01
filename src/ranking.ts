@@ -2,6 +2,7 @@
 
 export type Project = {
 	name: string;
+	slug?: string;
 	path: string;
 	relativePath: string;
 	host?: string;

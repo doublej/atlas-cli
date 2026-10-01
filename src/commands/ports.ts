@@ -17,9 +17,11 @@ interface PortAudit {
 export const ports: Command = {
 	name: 'ports',
 	summary: 'check for port collisions across daemons and projects',
-	async run() {
+	async run(args) {
 		await requireUp();
 		const audit = await apiGet<PortAudit>('/api/ports/audit');
+		if (audit.collisions.length) process.exitCode = 1;
+		if (args.includes('--json')) return console.log(JSON.stringify(audit));
 
 		if (audit.collisions.length) {
 			console.log(`Collisions (${audit.collisions.length}):`);
@@ -37,7 +39,5 @@ export const ports: Command = {
 				console.log(`  ${relativePath}  (${framework})`);
 			}
 		}
-
-		if (audit.collisions.length) process.exitCode = 1;
 	}
 };

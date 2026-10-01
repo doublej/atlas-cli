@@ -171,7 +171,8 @@ export const brief: Command = {
 		if (args.includes('--install-hook')) return installGlobalHooks();
 		try {
 			const data = await gather(process.cwd());
-			if (!data) return;
+			// Text stays silent outside a project (the hook); a JSON reader gets an explicit null.
+			if (!data) return args.includes('--json') ? console.log('null') : undefined;
 			console.log(args.includes('--json') ? JSON.stringify(data) : renderBrief(data, Date.now()));
 		} catch {
 			// a briefing must never break a session start

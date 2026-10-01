@@ -58,10 +58,17 @@ async function syncOne(host: HostDef): Promise<boolean> {
 	return copied.ok;
 }
 
-async function listHosts(): Promise<void> {
+async function listHosts(json: boolean): Promise<void> {
 	await requireUp();
 	const { hosts: states } = await apiGet<{ hosts?: HostState[] }>('/api/projects');
 	const byId = new Map((states ?? []).map((s) => [s.id, s]));
+	if (json) {
+		const rows = getHosts().map((h) => {
+			const s = byId.get(h.id);
+			return { id: h.id, role: h.role, ssh: h.ssh, root: expandHome(h.root), status: s?.status, scannedAt: s?.scannedAt, projectCount: s?.projectCount, error: s?.error };
+		});
+		return console.log(JSON.stringify(rows));
+	}
 
 	for (const h of getHosts()) {
 		const s = byId.get(h.id);
@@ -77,9 +84,10 @@ export const hosts: Command = {
 	name: 'hosts',
 	summary: 'list catalogued machines; `sync` ships the scan agent, `scan` refreshes one',
 	async run(args) {
-		const [sub, id] = args;
+		const [sub, id] = args.filter((a) => !a.startsWith('-'));
+		const json = args.includes('--json');
 
-		if (!sub || sub === 'list') return listHosts();
+		if (!sub || sub === 'list') return listHosts(json);
 
 		if (sub === 'sync') {
 			const targets = id
@@ -96,7 +104,7 @@ export const hosts: Command = {
 			await requireUp();
 			const query = id ? `?host=${encodeURIComponent(id)}&force=true` : '?force=true';
 			await apiPost(`/api/refresh${query}`);
-			return listHosts();
+			return listHosts(json);
 		}
 
 		die('Usage: atlas hosts [list | sync [host] | scan [host]]');

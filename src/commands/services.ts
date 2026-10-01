@@ -23,12 +23,13 @@ function print(services: ServiceState[]): void {
 export const services: Command = {
 	name: 'services',
 	summary: 'service hostnames: list, `sync` to route them now',
-	usage: 'Usage: atlas services [list | sync]',
+	usage: 'Usage: atlas services [list | sync] [--json]',
 	async run(args) {
-		const [sub] = args;
+		const [sub] = args.filter((a) => !a.startsWith('-'));
+		const show = (s: ServiceState[]) => (args.includes('--json') ? console.log(JSON.stringify(s)) : print(s));
 		await requireUp();
-		if (!sub || sub === 'list') return print((await apiGet<{ services: ServiceState[] }>('/api/services')).services);
-		if (sub === 'sync') return print((await apiPost<{ services: ServiceState[] }>('/api/services')).services);
+		if (!sub || sub === 'list') return show((await apiGet<{ services: ServiceState[] }>('/api/services')).services);
+		if (sub === 'sync') return show((await apiPost<{ services: ServiceState[] }>('/api/services')).services);
 		die(services.usage!);
 	}
 };
