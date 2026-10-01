@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import type { Command } from '../types';
 import { apiGet } from '../api';
 import { die, requireUp, resolveRoot } from '../util';
+import { projectFor } from './info';
 
 /** Mirrors `GitFlow` in atlas-api/src/lib/scanner.ts. */
 interface GitFlow {
@@ -66,11 +67,12 @@ export async function bootstrapFlow(root: string): Promise<void> {
 }
 
 /** `atlas flow` — what flow the repo in `root` is on right now. */
-async function status(root: string): Promise<void> {
+async function status(root: string, json: boolean): Promise<void> {
 	await requireUp();
 	const { projects } = await apiGet<{ projects: FlowProject[] }>('/api/projects');
-	const p = projects.find((x) => x.path === root);
+	const p = projectFor(projects, root);
 	if (!p?.flow) die(`No scanned project at ${root}. Run: atlas scan`);
+	if (json) return console.log(JSON.stringify({ name: p.name, path: p.path, gitBranch: p.gitBranch, git: p.git, flow: p.flow }));
 
 	const f = p.flow;
 	console.log(`${p.name}  (${f.policy})`);
@@ -83,7 +85,7 @@ async function status(root: string): Promise<void> {
 }
 
 /** `atlas flow audit` — split own repos into "safe to migrate now" and "needs a look first". */
-async function audit(): Promise<void> {
+async function audit(json: boolean): Promise<void> {
 	await requireUp();
 	const { projects } = await apiGet<{ projects: FlowProject[] }>('/api/projects');
 
@@ -113,6 +115,12 @@ async function audit(): Promise<void> {
 						: null;
 		if (reason) blocked.push([p, reason]);
 		else ready.push(p);
+	}
+
+	if (json) {
+		const rel = (ps: FlowProject[]) => ps.map((p) => p.relativePath);
+		const why = blocked.map(([p, reason]) => ({ relativePath: p.relativePath, reason }));
+		return console.log(JSON.stringify({ ready: rel(ready), blocked: why, done: rel(done), skipped }));
 	}
 
 	console.log(`Safe to migrate now (${ready.length}):`);
@@ -191,14 +199,14 @@ export const flow: Command = {
 	name: 'flow',
 	summary: 'branch flow: status, migration audit, opt a repo in',
 	async run(args) {
-		const [sub, ...rest] = args;
-		const dryRun = rest.includes('--dry-run') || args.includes('--dry-run');
-		const force = rest.includes('--force') || args.includes('--force');
-		const pathArg = rest.find((a) => !a.startsWith('--'));
+		const [sub, pathArg] = args.filter((a) => !a.startsWith('--'));
+		const json = args.includes('--json');
+		const dryRun = args.includes('--dry-run');
+		const force = args.includes('--force');
 
-		if (sub === 'audit') return audit();
+		if (sub === 'audit') return audit(json);
 		if (sub === 'init') return init(resolveRoot(pathArg), dryRun, force);
-		if (!sub || sub === 'status') return status(resolveRoot(pathArg));
+		if (!sub || sub === 'status') return status(resolveRoot(pathArg), json);
 		die(USAGE);
 	}
 };

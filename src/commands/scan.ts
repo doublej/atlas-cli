@@ -8,9 +8,11 @@ type Atlas = { projects: unknown[]; frameworks: string[] };
 export const scan: Command = {
 	name: 'scan',
 	summary: 'force a rescan of the development catalog',
-	async run() {
+	async run(args) {
 		await requireUp();
 		const atlas = await apiPost<Atlas>('/api/refresh');
+		if (args.includes('--json'))
+			return console.log(JSON.stringify({ projects: atlas.projects.length, frameworks: atlas.frameworks.length }));
 		console.log(`Rescanned — ${atlas.projects.length} projects, ${atlas.frameworks.length} frameworks`);
 	}
 };

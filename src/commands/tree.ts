@@ -25,20 +25,22 @@ async function runWeb(root: string): Promise<void> {
 }
 
 /** Print the ascii tree of CLAUDE.md context around `root` (`up`: ancestors only). */
-async function runView(root: string, up: boolean): Promise<void> {
+async function runView(root: string, up: boolean, json: boolean): Promise<void> {
 	await requireUp();
-	console.log(renderAsciiTree(await getTree(root, up)));
+	const nodes = await getTree(root, up);
+	console.log(json ? JSON.stringify(nodes) : renderAsciiTree(nodes));
 }
 
 /** Search every CLAUDE.md in the tree for `query` (case-insensitive). */
-async function runSearch(root: string, query?: string): Promise<void> {
+async function runSearch(root: string, query: string | undefined, json: boolean): Promise<void> {
 	if (!query) die('usage: atlas tree search <query> [path]');
 	await requireUp();
-	console.log(formatSearch(await getSearch(root, query)));
+	const hits = await getSearch(root, query);
+	console.log(json ? JSON.stringify(hits) : formatSearch(hits));
 }
 
 /** Print the ancestor→project chain concatenated — the context loaded at `root`. */
-async function runCompose(root: string): Promise<void> {
+async function runCompose(root: string, json: boolean): Promise<void> {
 	await requireUp();
 	// The chain is exactly the `up` graph — ask for it and skip the descendant walk.
 	const chain = (await getTree(root, true)).filter(
@@ -47,6 +49,7 @@ async function runCompose(root: string): Promise<void> {
 	const parts = await Promise.all(
 		chain.map(async (node) => ({ node, content: (await getFile(node.path)).content }))
 	);
+	if (json) return console.log(JSON.stringify(parts.map(({ node, content }) => ({ path: node.path, kind: node.kind, content }))));
 	console.log(formatCompose(parts));
 }
 
@@ -66,10 +69,11 @@ export const tree: Command = {
 	summary: 'CLAUDE.md tree — view/search/compose in terminal, or `web` for the viewer',
 	async run(args) {
 		const up = args.includes('--up');
-		const [sub, ...rest] = args.filter((a) => a !== '--up');
-		if (sub === 'view') return runView(resolveRoot(rest[0]), up);
-		if (sub === 'search') return runSearch(resolveRoot(rest[1]), rest[0]);
-		if (sub === 'compose') return runCompose(resolveRoot(rest[0]));
+		const json = args.includes('--json');
+		const [sub, ...rest] = args.filter((a) => a !== '--up' && a !== '--json');
+		if (sub === 'view') return runView(resolveRoot(rest[0]), up, json);
+		if (sub === 'search') return runSearch(resolveRoot(rest[1]), rest[0], json);
+		if (sub === 'compose') return runCompose(resolveRoot(rest[0]), json);
 		if (sub === 'web') return runWeb(resolveRoot(rest[0]));
 		console.log(HELP);
 	}

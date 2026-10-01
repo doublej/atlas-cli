@@ -55,6 +55,11 @@ export const run: Command = {
 		});
 
 		if (result.replaced) console.error(`stopped the previous dev server of ${project.name}`);
+		if (args.includes('--json')) {
+			console.log(JSON.stringify(result));
+			if (result.exited || !result.bound) process.exitCode = 1;
+			return;
+		}
 		if (result.exited)
 			die(`${project.name}'s dev server exited on startup — ${result.log}\n${logTail(result.log)}`);
 		if (!result.bound)

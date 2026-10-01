@@ -106,7 +106,7 @@ function render(p: InfoProject, hostname?: string): string[] {
 }
 
 /** The scanned project owning `root`: an exact match, else the nearest ancestor. */
-export const projectFor = (projects: InfoProject[], root: string): InfoProject | undefined =>
+export const projectFor = <P extends { path: string }>(projects: P[], root: string): P | undefined =>
 	projects
 		.filter((p) => root === p.path || root.startsWith(`${p.path}/`))
 		.sort((a, b) => b.path.length - a.path.length)[0];
@@ -115,6 +115,7 @@ export const projectFor = (projects: InfoProject[], root: string): InfoProject |
 export const info: Command = {
 	name: 'info',
 	summary: "show atlas's record for the current project",
+	usage: 'Usage: atlas info [path] [--json]   the project owning path (default: cwd); --json is the raw Project + hostname',
 	async run(args) {
 		const json = args.includes('--json');
 		const root = resolveRoot(args.find((a) => !a.startsWith('-')));
