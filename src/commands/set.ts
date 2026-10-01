@@ -49,7 +49,7 @@ const bool = is((v) => typeof v === 'boolean');
 
 /** The non-string keys: what each takes (for the error), and raw → the value the scanner reads. */
 const TYPED: Record<string, [string, (raw: string) => unknown]> = {
-	port: ['an integer port 1–65535', is((v) => Number.isInteger(v) && (v as number) > 0 && (v as number) < 65536)],
+	port: ['an integer port 1024–65535', is((v) => Number.isInteger(v) && (v as number) >= 1024 && (v as number) <= 65535)],
 	archived: ['true or false', bool],
 	devPublic: ['true or false', bool],
 	domains: ['domain names (a.com b.com) or a JSON string array', (raw) => {
