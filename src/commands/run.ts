@@ -9,7 +9,7 @@ interface RunResult {
 	url: string;
 	local?: string;
 	remote?: string;
-	/** Absent unless the dev server bound loopback only, which no hostname can reach. */
+	/** Absent unless the dev server bound loopback only; atlas then bridges it for the NAS. */
 	lanReachable?: boolean;
 	/** The spawned process was already gone before it bound anything. */
 	exited?: boolean;
@@ -67,13 +67,10 @@ export const run: Command = {
 				`${project.name}'s dev server bound nothing in ${WAIT_MS / 1000}s — ${result.log}\n${logTail(result.log)}`
 			);
 
-		if (result.lanReachable === false) {
-			console.log(result.url);
-			console.error(
-				"warning: it binds localhost only, so its dev hostname 502s — give the dev server --host 0.0.0.0 (vite: `server.host: true`)."
-			);
-			return;
-		}
+		// A loopback-only server is routed through atlas's NAS-only bridge, so its hostname works;
+		// the note says why it sits behind a forwarder.
+		if (result.lanReachable === false)
+			console.error("note: it binds localhost only — its dev hostname goes through atlas's bridge.");
 		console.log(result.local ?? result.remote ?? result.url);
 	}
 };
