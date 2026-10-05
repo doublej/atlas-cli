@@ -19,7 +19,8 @@ interface Problem {
 	fix: string;
 }
 
-const LEGACY = ['com.jurrejan.disk-autoclean', 'com.jurrejan.disk-bloat'];
+/** Legacy `_management/disk` jobs → the atlas schedule that replaces each. */
+const LEGACY: Record<string, Job> = { 'com.jurrejan.disk-autoclean': 'trim', 'com.jurrejan.disk-bloat': 'scan' };
 const uid = () => process.getuid?.() ?? 501;
 const loaded = (label: string) => Bun.spawnSync(['/bin/launchctl', 'print', `gui/${uid()}/${label}`]).exitCode === 0;
 
@@ -34,12 +35,16 @@ function scheduleProblems(s: Settings): Problem[] {
 	});
 }
 
-function legacyProblems(): Problem[] {
-	return LEGACY.filter(loaded).map((label) => ({
-		severity: 'warn',
-		what: `legacy job ${label} is still loaded — it would run a second trim`,
-		fix: `launchctl bootout gui/${uid()}/${label}`
-	}));
+/** A legacy job only doubles up once its atlas schedule is on; until then it is the only one running. */
+function legacyProblems(s: Settings): Problem[] {
+	return Object.entries(LEGACY)
+		.filter(([label]) => loaded(label))
+		.map(([label, job]): Problem => {
+			const bootout = `launchctl bootout gui/${uid()}/${label}`;
+			return s.schedules[job].enabled
+				? { severity: 'warn', what: `legacy job ${label} is still loaded — it would run a second ${job}`, fix: bootout }
+				: { severity: 'info', what: `legacy job ${label} still runs the weekly ${job} (atlas's ${job} schedule is off)`, fix: `atlas disk schedule enable ${job}, then ${bootout}` };
+		});
 }
 
 function archiveProblems(dir: string): Problem[] {
@@ -74,7 +79,7 @@ const MARK: Record<Severity, string> = { error: '✗', warn: '⚠', info: '·' }
 export async function run(args: string[]): Promise<Report> {
 	parseFlags(args);
 	const s = loadSettings();
-	const problems = [...scheduleProblems(s), ...legacyProblems(), ...archiveProblems(s.archiveDir), ...toolProblems(), ...jobProblems()];
+	const problems = [...scheduleProblems(s), ...legacyProblems(s), ...archiveProblems(s.archiveDir), ...toolProblems(), ...jobProblems()];
 	const serious = problems.filter((p) => p.severity !== 'info');
 	const text = problems.length ? problems.map((p) => `${MARK[p.severity]} ${p.what}\n    fix: ${p.fix}`).join('\n') : '✓ no problems found';
 	return { command: 'doctor', exit: serious.length ? 'partial' : 'ok', data: { problems }, text };
