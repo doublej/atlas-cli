@@ -1,6 +1,7 @@
 import type { Command } from '../types';
 import { emit, EXIT, type Report } from '../disk/report';
 import { pending } from '../disk/oplog';
+import { allowCloudReads } from '../disk/icloud';
 import { run as analyze } from '../disk/analyze';
 import { run as archive } from '../disk/archive';
 import { run as archives } from '../disk/archives';
@@ -67,6 +68,7 @@ export const disk: Command = {
 			return;
 		}
 		const json = rest.includes('--json');
+		allowCloudReads();
 		warnPending(sub);
 		try {
 			process.exitCode = emit(await entry[0](rest), json);

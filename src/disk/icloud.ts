@@ -3,9 +3,22 @@
  * one osascript call. `brctl status` answers "Client zone not found" for valid paths, so it
  * is never used. A path outside iCloud is `na`; osascript failing is `unknown`.
  */
+import { dlopen, FFIType } from 'bun:ffi';
 import { statSync } from 'node:fs';
 import type { Storage } from './types';
 import { exec, execOk } from './archive-exec';
+
+/**
+ * Let this process download a cloud-only file when it reads one. A process under launchd (the
+ * atlas-api daemon, the schedules) starts without that right, so reading an evicted manifest
+ * failed with EDEADLK there while the same read worked from a terminal.
+ */
+export function allowCloudReads(): void {
+	if (process.platform !== 'darwin') return;
+	const { symbols } = dlopen('/usr/lib/libSystem.B.dylib', { setiopolicy_np: { args: [FFIType.i32, FFIType.i32, FFIType.i32], returns: FFIType.i32 } });
+	// IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_ON
+	symbols.setiopolicy_np(3, 0, 2);
+}
 
 const JXA = `ObjC.import('Foundation');
 function run(argv) {
