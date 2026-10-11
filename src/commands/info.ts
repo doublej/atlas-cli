@@ -22,6 +22,7 @@ export interface InfoProject {
 	deploy?: { platform: string; url?: string }[];
 	domains?: string[];
 	umami?: { websiteIds: string[]; instance?: string };
+	tags?: string[];
 	beads?: { open: number; inProgress: number; closed: number };
 	claudeSessions?: { lastAt: string; count: number; summary?: string };
 	agentFiles?: { claude?: { tokens: number }; agents?: { tokens: number } };
@@ -84,6 +85,7 @@ function render(p: InfoProject, hostname?: string): string[] {
 		`${p.name}${p.archived ? '  (archived)' : ''}  —  ${p.relativePath}`,
 		p.description ? `  ${p.description}` : '',
 		'',
+		row('tags', p.tags?.join(' ')),
 		row('stack', stack),
 		row('port', p.port ? String(p.port) : undefined),
 		row('hostname', hostname),

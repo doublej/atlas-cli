@@ -10,6 +10,7 @@ import { stop } from './commands/stop';
 import { ps } from './commands/ps';
 import { kill } from './commands/kill';
 import { set } from './commands/set';
+import { tags } from './commands/tags';
 import { daemons } from './commands/daemons';
 import { pick } from './commands/pick';
 import { jump, search } from './commands/search';
@@ -33,6 +34,7 @@ export const COMMANDS: Command[] = [
 	init,
 	info,
 	set,
+	tags,
 	newProject,
 	scan,
 	open,
