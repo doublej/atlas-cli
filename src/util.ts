@@ -63,7 +63,36 @@ export async function ensureUp(): Promise<boolean> {
 	return false;
 }
 
-/** Like `ensureUp()`, but dies with a hint when the self-heal fails. */
+/**
+ * Why the daemon isn't serving, from `launchctl print` output (null = job not loaded) and the
+ * last line of its stderr log. Pure, so it is testable without launchd.
+ */
+export function explainDown(print: string | null, lastError?: string): string {
+	const target = daemonTarget();
+	if (print === null)
+		return `atlas-api isn't loaded in launchd (${target}).\n  Load it: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.jurrejan.atlas-api.plist`;
+	const field = (key: string) => print.match(new RegExp(`^\\s*${key} = (.+)$`, 'm'))?.[1];
+	const lines = [
+		`atlas-api still isn't up — launchd started it ${field('runs') ?? '?'} times, last exit code ${field('last exit code') ?? '?'}.`
+	];
+	if (lastError) lines.push(`  ${field('stderr path')}: ${lastError}`);
+	if (lastError?.includes('build/index.js'))
+		lines.push(`  The build is missing or half-written. Rebuild: cd ${field('working directory')} && bun run daemon:reload`);
+	lines.push(`  More: launchctl print ${target}`);
+	return lines.join('\n');
+}
+
+/** Read launchd's record of the daemon and the tail of its stderr log, then explain. */
+async function diagnoseDown(): Promise<string> {
+	const p = Bun.spawnSync(['launchctl', 'print', daemonTarget()]);
+	if (p.exitCode !== 0) return explainDown(null);
+	const print = p.stdout.toString();
+	const errPath = print.match(/^\s*stderr path = (.+)$/m)?.[1];
+	const log = errPath && (await Bun.file(errPath).exists()) ? await Bun.file(errPath).slice(-4096).text() : '';
+	return explainDown(print, log.trim().split('\n').at(-1) || undefined);
+}
+
+/** Like `ensureUp()`, but dies with the daemon's own failure reason when the self-heal fails. */
 export async function requireUp(): Promise<void> {
-	if (!(await ensureUp())) die(`atlas-api still isn't up. Check: launchctl print ${daemonTarget()}`);
+	if (!(await ensureUp())) die(await diagnoseDown());
 }
