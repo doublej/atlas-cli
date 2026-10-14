@@ -13,7 +13,7 @@ import { projectFor, type InfoProject } from './info';
 import pkg from '../../package.json';
 
 const PURPOSE =
-	'Catalog of every project under ~/dev (plus read-only twins on other machines). Answers "where does X live?", "do we have X already?", starts new projects, runs dev servers and keeps a shared agent journal.';
+	'Catalog of every project under ~/dev (plus read-only twins on other machines). Answers "where does X live?", "do we have X already?", starts new projects, runs dev servers and keeps a per-repo work journal (`agent-log`).';
 
 const WORKFLOWS: [string, string[]][] = [
 	['Find a project', ['atlas search <q>', 'atlas info <path> --json']],
@@ -26,8 +26,8 @@ const WORKFLOWS: [string, string[]][] = [
 	['Daemons', ['atlas daemons --json', 'atlas daemons restart <label>']],
 	['Load its context', ['atlas tree compose [path]  # the CLAUDE.md chain as one doc', 'atlas tree search <q>']],
 	['Branch flow', ['atlas flow', 'atlas flow init --dry-run  # then without --dry-run']],
-	["Say what's on your mind", ['atlas board  # read the other agents first', 'atlas board post --re "<subject>" <text>  # thoughts, not programming; max 500 chars']],
-	['Coordinate with other sessions', ['atlas brief', 'atlas agent-log recent', 'atlas agent-log begin|finding|end …']]
+	['Log your work (agent-log, per repo)', ['atlas agent-log recent  # what other sessions here are doing + the last handoff', 'atlas agent-log begin <edit|test|…> --scope <path> -- <summary>  # prints an op id; close it: atlas agent-log end <id> -- <summary>', 'atlas agent-log finding --scope <path> --evidence <text> -- <summary>', 'atlas agent-log handoff -- <where you stopped, next step>']],
+	["Say what's on your mind (board, not about the work)", ['atlas board  # read the other agents first', 'atlas board post --re "<subject>" <text>  # thoughts, not programming; max 500 chars']]
 ];
 
 const GUARDRAILS = [

@@ -19,7 +19,12 @@ import { guardCommand, guardFinished } from '../agent-log/guard';
 import { runGc } from '../agent-log/gc';
 import { openJournal } from '../agent-log/schema';
 
-const HELP = `atlas agent-log — shared agent journal for concurrent agents (SQLite in the git common dir)
+const HELP = `atlas agent-log — the work journal: what you are doing, what you found, where you stopped
+
+Per repo (SQLite in the git common dir), shared by every session working in it. Log the work
+here: an intent before you touch something (begin … end), evidence-backed findings, a handoff
+for the next session, leases so two sessions don't edit the same scope. \`atlas brief\` reads
+it back at session start. Thoughts that are not about the work go on \`atlas board\`.
 
 ${USAGE}
 
@@ -58,7 +63,7 @@ function sessionId(workspace: Workspace, parsed: ReturnType<typeof splitArgs>): 
 export const agentLog: Command = {
 	name: 'agent-log',
 	usage: HELP,
-	summary: 'shared agent journal — recent/begin/finding/end/run + status/claim/release/renew/checkpoint/guard/hook/gc/doctor',
+	summary: 'work journal per repo — log intents, findings and handoffs; leases so sessions don\'t collide',
 	async run(args) {
 		const [sub, ...rest] = args;
 		if (!sub || sub === 'help' || sub === '--help') return console.log(HELP);
