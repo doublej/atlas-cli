@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import type { Command } from '../types';
-import { apiGet, apiPatch } from '../api';
+import { apiGet, apiPatch, apiPut } from '../api';
 import { die, requireUp } from '../util';
 import { projectFor, type InfoProject } from './info';
 
@@ -27,6 +27,7 @@ Keys: ${ATLAS_KEYS.join(' ')}
 Values: port 4100 · archived, devPublic true|false · domains a.com b.com (or a JSON array) ·
 umami a website id (or JSON) · flow, agent-log a JSON object · slug, description, type, framework,
 domain plain text (\`slug 2048\` stays "2048"). Anything else is exit 1 before any write.
+description is the exception: it goes to ~/dev/.atlas-descriptions.json, which beats .atlas.
 A slug, port or devPublic change moves the project's dev hostname and reloads the shared NAS Caddy
 (the wildcard certificate covers it), so never in a loop.`;
 
@@ -99,6 +100,12 @@ export const set: Command = {
 		const { projects } = await apiGet<{ projects: InfoProject[] }>('/api/projects');
 		const project = projectFor(projects, process.cwd());
 		if (!project) die(`No scanned project at ${process.cwd()}. Run: atlas scan`);
+		if (key === 'description') {
+			// The central file beats .atlas, so a .atlas description would be shadowed by any entry there.
+			await apiPut('/api/description', { path: project.path, description: value ?? '' });
+			if (values.json) return console.log(JSON.stringify({ updated: true }));
+			return console.log(`description ${value === null ? 'cleared' : `= ${value}`}  (~/dev/.atlas-descriptions.json)`);
+		}
 		const res = await apiPatch<{ hostname?: HostnameState }>('/api/atlas', {
 			path: project.path,
 			patch: { [key]: value }
