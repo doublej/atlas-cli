@@ -6,9 +6,10 @@ import type { InfoProject } from './info';
 
 const USAGE = `Usage: atlas agents [mcp|cli] [query] [--json]   the register of agent interfaces
 
-One row per MCP server or agent-ready CLI a project ships. Detected from the project's files:
-an MCP SDK dependency, or a bin whose entry point or README/CLAUDE.md/AGENTS.md mentions --json
-or a \`prime\` command. Correct a wrong guess in the project's .atlas, which replaces detection:
+One row per MCP server or agent-ready CLI, bound to the project holding its source. Detected:
+an MCP SDK dependency anywhere in the project, bins installed on PATH from ~/dev (bun link, uv
+tool, go install), counted when their source mentions --json or a \`prime\` command.
+Correct a wrong guess in the project's .atlas, which replaces detection:
   atlas set agentInterfaces "cli:atlas mcp:deckhand"     ([] clears it)`;
 
 export interface AgentRow {
