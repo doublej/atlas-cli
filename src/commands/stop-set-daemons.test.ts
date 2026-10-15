@@ -86,6 +86,9 @@ describe('atlas set', () => {
 			['agent-log', '["warn"]', undefined],
 			['umami', 'c0ffee-1d', 'c0ffee-1d'],
 			['umami', '{"instance":"https://u.example"}', undefined],
+			['agentInterfaces', 'cli:atlas mcp:deckhand', [{ kind: 'cli', name: 'atlas' }, { kind: 'mcp', name: 'deckhand' }]],
+			['agentInterfaces', '[]', []],
+			['agentInterfaces', 'atlas', undefined],
 			['slug', '2048', '2048'],
 			['description', ' ', undefined]
 		];

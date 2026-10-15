@@ -11,6 +11,7 @@ import { ps } from './commands/ps';
 import { kill } from './commands/kill';
 import { set } from './commands/set';
 import { tags } from './commands/tags';
+import { agents } from './commands/agents';
 import { daemons } from './commands/daemons';
 import { pick } from './commands/pick';
 import { jump, search } from './commands/search';
@@ -35,6 +36,7 @@ export const COMMANDS: Command[] = [
 	info,
 	set,
 	tags,
+	agents,
 	newProject,
 	scan,
 	open,

@@ -23,6 +23,8 @@ export interface InfoProject {
 	domains?: string[];
 	umami?: { websiteIds: string[]; instance?: string };
 	tags?: string[];
+	host?: string;
+	agentInterfaces?: { kind: 'cli' | 'mcp'; name: string }[];
 	beads?: { open: number; inProgress: number; closed: number };
 	claudeSessions?: { lastAt: string; count: number; summary?: string };
 	agentFiles?: { claude?: { tokens: number }; agents?: { tokens: number } };
@@ -103,6 +105,7 @@ function render(p: InfoProject, hostname?: string): string[] {
 		row('sessions', p.claudeSessions && `${p.claudeSessions.count} · last ${ago(p.claudeSessions.lastAt)}`),
 		row('claude', claudeLine(p)),
 		row('mcp', mcpLine(p)),
+		row('offers', p.agentInterfaces?.map((i) => `${i.kind} ${i.name}`).join(' · ')),
 		row('modified', p.modifiedAt && ago(p.modifiedAt))
 	].filter((line) => line !== '');
 }

@@ -17,6 +17,7 @@ export const ATLAS_KEYS = [
 	'domains',
 	'umami',
 	'flow',
+	'agentInterfaces',
 	'agent-log'
 ];
 
@@ -25,7 +26,8 @@ const USAGE = `Usage: atlas set <key> <value> [--json]   write one override into
 
 Keys: ${ATLAS_KEYS.join(' ')}
 Values: port 4100 · archived, devPublic true|false · domains a.com b.com (or a JSON array) ·
-umami a website id (or JSON) · flow, agent-log a JSON object · slug, description, type, framework,
+umami a website id (or JSON) · agentInterfaces cli:atlas mcp:deckhand ([] clears) ·
+flow, agent-log a JSON object · slug, description, type, framework,
 domain plain text (\`slug 2048\` stays "2048"). Anything else is exit 1 before any write.
 description is the exception: it goes to ~/dev/.atlas-descriptions.json, which beats .atlas.
 A slug, port or devPublic change moves the project's dev hostname and reloads the shared NAS Caddy
@@ -60,6 +62,12 @@ const TYPED: Record<string, [string, (raw: string) => unknown]> = {
 	umami: ['a website id, a JSON array of ids or {"websiteIds": […], "instance": "…"}', (raw) => {
 		const v = json(raw) ?? raw;
 		return typeof v === 'string' || isStrings(v) || (isObject(v) && isStrings(v.websiteIds)) ? v : undefined;
+	}],
+	agentInterfaces: ['kind:name pairs (cli:atlas mcp:deckhand), [] for none, or a JSON array', (raw) => {
+		const v = json(raw);
+		if (Array.isArray(v)) return v.every((e) => isObject(e) && /^(cli|mcp)$/.test(String(e.kind)) && typeof e.name === 'string' && e.name) ? v : undefined;
+		const pairs = raw.split(/[\s,]+/).filter(Boolean).map((t) => /^(cli|mcp):(\S+)$/.exec(t));
+		return pairs.length && pairs.every(Boolean) ? pairs.map((m) => ({ kind: m![1], name: m![2] })) : undefined;
 	}],
 	flow: ['a JSON object, e.g. {"trunk": "main", "integration": "develop"}', is(isObject)],
 	'agent-log': ['a JSON object, e.g. {"mode": "warn"}', is(isObject)]
