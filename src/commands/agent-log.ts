@@ -18,6 +18,7 @@ import { checkpointEvent } from '../agent-log/transitions';
 import { guardCommand, guardFinished } from '../agent-log/guard';
 import { runGc } from '../agent-log/gc';
 import { openJournal } from '../agent-log/schema';
+import { POLICY_TEXT } from '../agent-log/policy';
 
 const HELP = `atlas agent-log — the work journal: what you are doing, what you found, where you stopped
 
@@ -47,6 +48,8 @@ ${USAGE}
   gc        retention sweep for telemetry, expired leases, closed sessions
   doctor    schema version, hook coverage, stale sessions, aliases, clock
 
+Policy:
+${POLICY_TEXT}
 Env: ATLAS_AGENT_LOG_PATH overrides the journal db location.`;
 
 function requireWorkspace(): Workspace {

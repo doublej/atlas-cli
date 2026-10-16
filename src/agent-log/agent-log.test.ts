@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MARKER, SHIM_CONTENT } from './policy';
+import { END_MARKER, MARKER, POLICY_BLOCK, SHIM_CONTENT } from './policy';
 
 const CLI = new URL('../atlas.ts', import.meta.url).pathname;
 const ROOT = new URL('../..', import.meta.url).pathname;
@@ -166,6 +166,22 @@ describe('agent-log init', () => {
 		expect(invoke(['init'], repo).exitCode).toBe(0);
 		expect(readFileSync(join(repo, 'CLAUDE.md'), 'utf8')).toBe(before);
 		rmSync(repo, { recursive: true, force: true });
+	});
+
+	test('rewrites a legacy policy block in place and keeps what follows it', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'atlas-agent-log-legacy-'));
+		const legacy = `${MARKER}\n### Shared agent journal\n\nold text\nlives in the git common directory, so linked worktrees share it without dirtying the repo.\n`;
+		writeFileSync(join(dir, 'CLAUDE.md'), `# Repo\n\nintro\n\n${legacy}\n<!-- BEGIN BEADS -->\n## Beads\n`);
+
+		expect(invoke(['init'], dir).exitCode).toBe(0);
+		const once = readFileSync(join(dir, 'CLAUDE.md'), 'utf8');
+		expect(once).toBe(`# Repo\n\nintro\n\n${POLICY_BLOCK}\n<!-- BEGIN BEADS -->\n## Beads\n`);
+		expect(once.split(MARKER).length).toBe(2);
+		expect(once).toContain(END_MARKER);
+
+		expect(invoke(['init'], dir).exitCode).toBe(0);
+		expect(readFileSync(join(dir, 'CLAUDE.md'), 'utf8')).toBe(once);
+		rmSync(dir, { recursive: true, force: true });
 	});
 
 	test('skips db warm-up gracefully outside a git repo', () => {

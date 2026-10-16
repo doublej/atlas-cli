@@ -10,10 +10,21 @@ exec atlas agent-log "$@"
 
 export const MARKER = '<!-- agent-log:policy -->';
 
+export const END_MARKER = '<!-- /agent-log:policy -->';
+
+/** Short block written into each repo's CLAUDE.md; the full policy lives in `--help`. */
 export const POLICY_BLOCK = `${MARKER}
 ### Shared agent journal
 
-Use \`./agent-log\` (a shim for \`atlas agent-log\` — both are identical) for short-lived
+\`./agent-log\` (shim for \`atlas agent-log\`) is the short-lived journal concurrent agents in this
+repo share; the issue tracker stays the source of truth.
+- Run \`./agent-log recent\` before interpreting shared state.
+- Full policy (intents, the \`run\` wrapper, findings, handoff, scopes): \`./agent-log --help\`.
+${END_MARKER}
+`;
+
+/** The full journal policy, printed by `atlas agent-log --help`. */
+export const POLICY_TEXT = `Use \`./agent-log\` (a shim for \`atlas agent-log\` — both are identical) for short-lived
 operational awareness between concurrent agents. It is not chat and not a task tracker: the
 issue tracker remains the source of truth for ownership, blockers, and durable findings.
 
