@@ -14,6 +14,7 @@ wrapper works.
   Commands that skip it degrade (print the URL or a hint) instead.
 - **A child process can't change its parent shell.** Commands that must (`jump`, `new`) write one
   line to `$ATLAS_SHELL_FILE`, which `shell/atlas.zsh` evals (`util.ts:shellExec`/`cdLine`).
+- **Not here on purpose**: iTerm/Finder (GUI) and git/README/beads (agents have the tools).
 
 ## Invariants
 
