@@ -1,105 +1,53 @@
-# CLAUDE.md
+# atlas-cli
 
-Guidance for Claude Code when working in `atlas-cli`.
+The global **`atlas`** command: a thin Bun/TypeScript client to atlas-api (`:47891`, override with
+`ATLAS_API`). Workspace architecture and vocabulary are in the parent `../CLAUDE.md`.
 
-## Overview
+See `docs/commands.md` for the full command table, the `src/` layout and how the `shell/atlas.zsh`
+wrapper works.
 
-`atlas-cli` is the global **`atlas`** command — a thin Bun/TypeScript client to the
-project-atlas API (`atlas-api` on `:47891`). It is the single source of truth for
-cross-project atlas actions that used to be duplicated as per-project justfile recipes
-(e.g. the `claude-tree` recipe across 15 cookiecutter templates now just calls `atlas tree web`).
+## Mental model
 
-It is a **consumer** of the API, not a producer — it never scans or reads the cache
-directly (that's atlas-api's job). When the API is down, `requireUp()` self-heals by
-kickstarting the `com.jurrejan.atlas-api` launchd daemon and polling before giving up;
-commands that skip `requireUp()` degrade gracefully (print the URL / a hint) instead.
+- **A consumer of the API, never a producer.** It never scans or reads the cache itself. The
+  exceptions are local-only by design and have no API: `disk`, `board`, `flow`.
+- **`requireUp()` self-heals**: it kickstarts `com.jurrejan.atlas-api` and polls before giving up.
+  Commands that skip it degrade (print the URL or a hint) instead.
+- **A child process can't change its parent shell.** Commands that must (`jump`, `new`) write one
+  line to `$ATLAS_SHELL_FILE`, which `shell/atlas.zsh` evals (`util.ts:shellExec`/`cdLine`).
 
-## Architecture
+## Invariants
 
-```
-src/
-  atlas.ts        entry — shebang + argv router (help / dispatch)
-  registry.ts     COMMANDS table + usage() help text
-  types.ts        Command interface { name, summary, run(args) }
-  api.ts          API_BASE (ATLAS_API override), isUp(), apiGet/apiPost/apiPatch/apiDelete — one request();
-                  a non-2xx answer throws the body's `error` (else `message`, else the status line)
-  util.ts         die(), resolveRoot(), openUrl(), requireUp(), shellExec()/cdLine()
-  tree-format.ts  pure terminal renderers for the CLAUDE.md tree (ascii/search/compose)
-  logo.ts         atlas-picker's splash art, reused by `atlas help` (copy of splash.rs)
-  template-discovery.ts  offline cookiecutter discovery + DEV_FOLDER/templatesDir (for `new`)
-  new-prompts.ts  @inquirer/prompts helpers for `new` (category/template/output) — import it lazily:
-                  loading @inquirer/prompts at startup cut every command's piped stdout at 64 KB
-  processes.ts    mirror of atlas-api/src/lib/processes/types.ts (change both together)
-  kill-targets.ts what `kill <pid|:port|project>` resolves to (pid + start time pairs)
-  fake-api.ts     test helper: a stand-in atlas-api + the CLI as a child process against it
-  commands/       one file per subcommand, each exporting a Command
-shell/
-  atlas.zsh       `atlas` zsh wrapper (+ the `pj` function) — evals what the CLI hands back
-```
-
-## Shell integration (`shell/atlas.zsh`)
-
-A child process can't cd — or run anything — in the shell that spawned it. So commands that
-need the parent shell write one shell line to `$ATLAS_SHELL_FILE`; the `atlas()` zsh function
-creates that file, runs the real binary, then evals the line (`util.ts:shellExec`/`cdLine`).
-Without the wrapper the line is printed instead, so it stays copy-pasteable. Users: `jump`
-(cd, plus `--run`'s command chained after it) and `new` (cd into what it scaffolded).
-Everything else passes straight through, exit code intact.
-
-`pj` lives here too and is just `atlas jump "$@"` — the query/picker/`exec:` handling that
-used to be duplicated in atlas-picker's `shell/pj.zsh` is now in the CLI. `pj.zsh` keeps
-only the picker-specific `pjc`/`pjd`/widget helpers. Both files are sourced from `~/.zshrc`.
-
-| Command | Status | Notes |
-|---------|--------|-------|
-| `prime [--json]` | ✅ | agent crash course, first in `atlas help`: purpose, workflows (commands are left to `atlas help`), guardrails, output contract, detected cwd/project/API state. Markdown by default; `--json` emits the same model. Edit its `WORKFLOWS`/`GUARDRAILS` when a command's contract changes |
-| `brief [--json\|--install-hook]` | ✅ | session briefing (last session, handoff, journal, beads, CLAUDE.md size) from local sources only; the global SessionStart hook. Silent outside a recognized project |
-| `tree` | ✅ | no subcommand → prints tree help |
-| `tree view [path] [--up]` | ✅ | ascii CLAUDE.md tree in the terminal (from `?root=` graph). `--up` requests `&up=1` — only the chain towards the root, skipping the walk into children |
-| `tree search <q> [path]` | ✅ | case-insensitive search across every CLAUDE.md in the tree |
-| `tree compose [path]` | ✅ | concatenate the ancestor→project chain — the loaded context, as one md doc (always `&up=1`; the chain *is* the up graph) |
-| `tree web [path]` | ✅ | opens `/claude-tree?root=<path\|cwd>`; cookiecutter recipes call this |
-| `info [path] [--json]` | ✅ | atlas's record for the current project (stack, port, dev hostname, branch/flow, scripts, deploy, domains, umami, beads, sessions). Resolves the nearest owning project from a subfolder; `--json` prints the raw `Project` |
-| `init` | ✅ | writes a starter `.atlas` (replaces the old `atlas-init` zsh fn) |
-| `new` | ✅ | scaffold a project: pick category (`/api/categories`) → template (`/api/templates`) → `cookiecutter`, then `POST /api/refresh`. Offline: local glob via `template-discovery.ts` + free-text category. Non-interactive: `atlas new <family/name> --name <n> --category <cat>\|--out <dir> [--var k=v ...]` (runs `cookiecutter --no-input`; agent-friendly). Ends inside the new project via the `shell/atlas.zsh` wrapper |
-| `scan` | ✅ | `POST /api/refresh`, prints project/framework counts |
-| `open` | ✅ | opens the atlas web UI |
-| `run [path]` | ✅ | starts the project's dev server via `POST /api/run`, prints its hostname (falls back to `localhost:<port>` when Caddy dev hostnames aren't set up) |
-| `pick` | ✅ | passthrough to `atlas-picker` (prints only — use `jump`/`pj` to cd) |
-| `jump [q] [--run <cmd>]` | ✅ | the whole `pj` flow: best match, or the fuzzy picker with no query → hands the shell `cd <path> && echo → <name>`, with `--run`'s command chained on (`--cmd`/`-r` are aliases). `--run` is eval'd in the shell, so aliases and functions work; an unknown flag errors instead of being searched for. **Ranking is local-first** — a Fractal/Ubuntu twin can never outrank a project that exists here, which is what made `pj framelink` refuse — then exact name, then prefix, then a path hit, shallowest first. When no project carries the query as its name, a *folder* named exactly that wins (`pj framelink` → `multi-stack/framelink`, the workspace holding `app`/`auth`/`broker`); ambiguity there is broken by how many projects live under the folder |
-| `search <q>` | ✅ | substring match on project name/path via `/api/projects`, same local-first ranking as `jump` (remote rows are tagged `[fractal]`); also the fallback for `atlas <query>` when the first arg isn't a command. With `--run` it delegates to `jump`, so `atlas <query> --run <cmd>` works |
-| `install-autocompletion` | ✅ | generates `_atlas` (zsh, completes `atlas` **and** `pj`) into the first `$fpath` dir under `$HOME` — `~/.zsh/completions` when it's registered. Commands + summaries come from `COMMANDS`, so **rerun it after adding a command**; project names come from the scan cache via `jq` at completion time (no bun spawn per Tab). After `--run` it shifts the frame and calls `_normal`, so the command being run completes normally |
-| `flow` | ✅ | branch flow. `flow`/`flow status` prints the current project's policy/trunk/integration from `/api/projects`; `flow audit` splits our repos into safe-to-migrate, blocked (dirty tree, wrong branch) and already-on-flow; `flow init [path] [--dry-run] [--force]` creates `develop`, renames `master` → `main`, writes the `.atlas` `flow` block. Pure local git — no API endpoint. `bootstrapFlow()` is exported for `atlas new` |
-| `disk <sub>` | ✅ | disk-space manager, **local-only (no API)** — spec `../.orchestrate/disk-spec.md`. `analyze`/`archive`/`archives`/`restore` (idle projects ⇄ verified `.tar.zst` in iCloud), `scan`/`clean` (rebuildable folders by risk), `trim` (tools' own clean-up), `schedule` (launchd jobs in `launchd/`), `recover`, `log`, `config`, `doctor`, `tui` (→ `atlas-disk`). Code in `src/disk/`: every change goes through `oplog.ts` (start fsync'd first), `lock.ts` (one job at a time) and `approval.ts` (the spec's policy table — edit it there, nowhere else). Every subcommand returns a `Report`; `--json` and exit codes come from `report.ts`. Test with `ATLAS_DISK_HOME=<scratch>` and fixture `devRoot`/`archiveDir` — never against real projects |
-| `board [read\|post\|speak]` | ✅ | the agents' message board, **global and local-only (no API)**: one append-only JSONL at `~/Library/Application Support/atlas-board/board.jsonl` (`ATLAS_BOARD_PATH` overrides — tests use it). Informal: agents talk about anything, JJ included; task state stays in `agent-log`. Posts max 500 chars. Author is `$CLD_SESSION_NAME`, project the cwd basename. Posts need a subject (`--re`, max 40 chars; a reply starts it with `#NNNN`) and raise a macOS notification (`ATLAS_BOARD_QUIET=1` skips it; tests set it). `atlas brief` shows the last 3 posts, shortened. `speak` voices posts through Chatterbox on Fractal (`ATLAS_TTS_URL`, default `http://fractal.local:4123`): `voices.json` (author → library voice, least-used for a new author) and `audio/NNNN.wav` beside the board, spoken from `audio/NNNN.txt`: a `claude -p --model haiku` rewrite into words only (no commands, paths, symbols; `MAX_THINKING_TOKENS=0` or it takes a minute). Existing audio is skipped, an existing script is reused. One run at a time (`speak.lock`, pid checked); a run keeps passing until nothing is missing, so posts landing mid-run are caught. Every `post` runs it detached (log: `speak.log`), so audio lands the moment a post does; `voice-refs/` holds the reference clips and their YouTube sources. The prompt to post lives in `~/.claude/CLAUDE.md` (`< Board >`) |
-| `ports` | ✅ | `GET /api/ports/audit` — prints port collisions (daemons + scanned projects) and unmanaged (port-bearing framework, no declared port) projects; exits 1 on collisions |
-| `ps [--project <q>] [--kind <k>] [--all]` | ✅ | `GET /api/processes?all=1`, filtered here: dev rows by default, `--project` = substring of a row's project name/slug. Table with COMMAND cut to the terminal width; footer `N shown · M hidden (--all)` |
-| `kill <pid\|:port\|project> [--tree] [--force] [--all] [--dry-run] [--yes]` | ✅ | resolves pid + start time (`/api/processes?all=1&fresh=1`, `:port` via `/api/ports/listeners`); a project is its dev rows minus claude/codex/mcp/shell/language-server rows (`--all` adds non-dev), and the CLI's own ancestry (ppid walk through a local `ps -axo pid=,ppid=` taken after the snapshot, because `fresh=1` still joins a snapshot build in flight, which can predate the calling shell) is always dropped. It always sends `POST /api/processes/stop` with `dryRun: true` first and prints what would end + refusals on stderr; then a TTY confirm on stderr or `--yes` (no TTY, no `--yes` → exit 4). `--json` prints a `StopResponse` even when nothing stops (the dry-run preview, or an empty one on no match). The server does every other safety check. Exit codes are disk's (`report.ts` `exitFor`) |
-| `stop [path]` | ✅ | `DELETE /api/run` for the project owning path/cwd |
-| `set <key> <value>` · `set --unset <key>` | ✅ | `PATCH /api/atlas` on the project owning cwd (`null` clears). Keys are the ones something reads (`ATLAS_KEYS`); each value is checked against the type the scanner reads (`TYPED`: port integer, archived/devPublic boolean, domains string list, flow/agent-log object, umami id or object; the rest non-empty text), exit 1 before any write otherwise. Prints the moved `hostname` when the response has one |
-| `daemons [restart <label>]` | ✅ | `GET /api/daemons`; `restart` takes a unique part of a label/name and refuses `selfManaged` (atlas-api) before calling |
-| `hostnames check <slug> [path]` · `hostnames doctor [--fix]` | ✅ | contract C.2: `check` prints the verdict (exit 0 only for free/current); `doctor` lists drift and exits 1 while any remains, `--fix` posts the repair |
-
-Every command that prints data takes `--json` (one compact document on stdout, the text-mode exit
-code). The text-only exceptions are listed in `prime.ts` `OUTPUT` — keep that list true when a
-subcommand gains or lacks `--json`. Not here on purpose: iTerm/Finder (GUI) and git/README/beads (agents have the tools).
+- **Every data command takes `--json`** (one compact document on stdout, the text-mode exit code).
+  The text-only exceptions are listed in `prime.ts` `OUTPUT`; keep that list true. When a
+  command's contract changes, update `prime.ts` `WORKFLOWS`/`GUARDRAILS` too.
+- **Import `new-prompts.ts` lazily**: loading `@inquirer/prompts` at startup cuts every command's
+  piped stdout at 64 KB.
+- **`src/processes.ts` mirrors `atlas-api/src/lib/processes/types.ts`**; change both together.
+- **`jump`/`search` rank local-first**: a Fractal/Ubuntu twin never outranks a project that exists
+  here.
+- **`kill` always dry-runs first** (`POST /api/processes/stop` with `dryRun: true`) and drops the
+  CLI's own ancestry; no TTY and no `--yes` is exit 4. The server does every other safety check.
+- **`disk`**: every change goes through `src/disk/oplog.ts` (start fsync'd first), `lock.ts` (one
+  job at a time) and `approval.ts` (the policy table: edit it there, nowhere else). Spec:
+  `../.orchestrate/disk-spec.md`. Test with `ATLAS_DISK_HOME=<scratch>` and fixture
+  `devRoot`/`archiveDir`, never against real projects.
+- **`board`** tests set `ATLAS_BOARD_PATH` and `ATLAS_BOARD_QUIET=1`. `speak`'s
+  `claude -p --model haiku` rewrite needs `MAX_THINKING_TOKENS=0` or it takes a minute.
 
 ## Adding a command
 
-1. Create `src/commands/<name>.ts` exporting `const <name>: Command` (keep it tiny —
-   one responsibility, lean on `api.ts`/`util.ts` helpers).
-2. Register it in `src/registry.ts` (`COMMANDS` array). Help text, `atlas prime`'s command list
-   and the zsh completion are generated from `name` + `summary` (+ `usage` for `--help`).
-3. Test it against `fake-api.ts`, never the live daemon.
+1. Create `src/commands/<name>.ts` exporting `const <name>: Command` (one responsibility, lean on
+   `api.ts`/`util.ts`).
+2. Register it in `src/registry.ts` (`COMMANDS`). Help, `atlas prime`'s list and zsh completion
+   come from `name` + `summary` (+ `usage`). Rerun `atlas install-autocompletion` afterwards.
+3. Test it against `src/fake-api.ts`, never the live daemon.
 
-## Commands
+## Verification
 
 ```bash
-bun install          # deps (bun-types, typescript)
-bun link             # install the `atlas` bin onto PATH (~/.bun/bin)
-bunx tsc --noEmit    # typecheck
-atlas help           # list commands
+bun install && bun link   # install the `atlas` bin onto PATH (~/.bun/bin)
+bunx tsc --noEmit         # typecheck
+bun test
 ```
 
 Conventions: Bun runtime, tabs, small functions (≤20 lines), files <150 lines.
-Override the API host with `ATLAS_API` (default `http://localhost:47891`).
