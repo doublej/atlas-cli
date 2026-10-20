@@ -19,7 +19,7 @@ const WORKFLOWS: [string, string[]][] = [
 	['Find a project', ['atlas search <q>', 'atlas info <path> --json']],
 	['Start a project', ['atlas templates', 'atlas new <family/name> --name <n> --category <cat> [--var k=v]']],
 	['Free disk space', ['atlas disk analyze --json  # then: atlas disk archive <category/project> --dry-run', 'atlas disk scan --json  # clean: atlas disk clean <path> --unattended (policy-gated)', 'atlas disk doctor']],
-	['Run it', ['atlas run [path]  # prints the dev hostname; atlas follows the port the server binds', 'atlas stop [path]']],
+	['Run it', ['atlas run [path]  # prints the dev hostname; a moved port prints "port moved N -> M" (--json portMoved)', 'atlas stop [path]']],
 	['Processes', ['atlas ps [--project <q>] [--all] --json  # what runs, by project', 'atlas kill <pid|:port|project> --dry-run  # then the same with --yes']],
 	['Project settings', ['atlas set <key> <value>  # one .atlas override: slug, port, description, …', 'atlas set --unset <key>']],
 	['Hostnames', ['atlas hostnames check <slug>  # free · current · taken by … · invalid: …', 'atlas hostnames doctor --json  # then: atlas hostnames doctor --fix']],
